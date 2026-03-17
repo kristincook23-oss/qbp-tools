@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QBP Vendor Content Portal</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #ffffff; --bg-secondary: #f7f6f3; --bg-tertiary: #efede8;
+  --text-primary: #1a1917; --text-secondary: #6b6a66; --text-tertiary: #9e9d99;
+  --border: rgba(0,0,0,0.11); --border-med: rgba(0,0,0,0.20);
+  --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'SF Mono','Fira Code',monospace;
+  --green-bg:#E1F5EE; --green-text:#085041; --green-border:#0F6E56;
+  --amber-bg:#FAEEDA; --amber-text:#633806; --amber-border:#BA7517;
+  --blue-bg:#E6F1FB;  --blue-text:#0C447C;  --blue-border:#185FA5;
+  --red-bg:#FCEBEB;   --red-text:#A32D2D;   --red-border:#E24B4A;
+  --gray-bg:#F1EFE8;  --gray-text:#5F5E5A;  --gray-border:#888780;
+  --brand: #D4531E;
+}
+body { font-family:var(--font); background:var(--bg-tertiary); color:var(--text-primary); min-height:100vh; }
+
+/* NAV */
+.nav { background:var(--bg); border-bottom:0.5px solid var(--border); padding:0 2rem; display:flex; align-items:center; justify-content:space-between; height:56px; }
+.nav-brand { display:flex; align-items:center; gap:12px; }
+.nav-logo { width:32px; height:32px; background:var(--brand); border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:14px; }
+.nav-title { font-size:15px; font-weight:500; }
+.nav-subtitle { font-size:12px; color:var(--text-secondary); margin-top:1px; }
+.nav-right { display:flex; align-items:center; gap:10px; }
+.mode-badge { font-size:11px; font-weight:500; padding:3px 10px; border-radius:20px; }
+.mode-admin  { background:var(--amber-bg); color:var(--amber-text); }
+.mode-vendor { background:var(--green-bg); color:var(--green-text); }
+
+/* LAYOUT */
+.main { max-width:900px; margin:0 auto; padding:2rem 1.5rem 4rem; }
+
+/* BUTTONS */
+.btn { background:var(--bg); border:0.5px solid var(--border-med); border-radius:var(--radius-md); padding:8px 16px; font-size:13px; font-family:var(--font); color:var(--text-primary); cursor:pointer; display:inline-flex; align-items:center; gap:7px; transition:background 0.14s; white-space:nowrap; }
+.btn:hover { background:var(--bg-secondary); }
+.btn:disabled { opacity:0.35; cursor:default; pointer-events:none; }
+.btn-primary { background:var(--brand); color:#fff; border-color:var(--brand); }
+.btn-primary:hover { background:#b8451a; }
+.btn-sm { padding:5px 12px; font-size:12px; }
+.btn-ghost { border-color:transparent; background:transparent; }
+.btn-ghost:hover { background:var(--bg-secondary); }
+
+/* CARDS */
+.card { background:var(--bg); border:0.5px solid var(--border); border-radius:var(--radius-lg); padding:1.5rem; margin-bottom:1rem; }
+.card-title { font-size:16px; font-weight:500; margin-bottom:4px; }
+.card-sub { font-size:13px; color:var(--text-secondary); }
+
+/* STEPS (admin) */
+.steps { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.5rem; }
+@media(max-width:600px){.steps{grid-template-columns:1fr;}}
+.step { background:var(--bg); border:0.5px solid var(--border); border-radius:var(--radius-lg); padding:1.25rem; position:relative; }
+.step.complete { border-color:var(--green-border); }
+.step-num { width:28px; height:28px; border-radius:50%; background:var(--bg-secondary); border:0.5px solid var(--border-med); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:500; color:var(--text-secondary); margin-bottom:10px; }
+.step.complete .step-num { background:var(--green-bg); color:var(--green-text); border-color:var(--green-border); }
+.step-title { font-size:14px; font-weight:500; margin-bottom:4px; }
+.step-desc { font-size:12px; color:var(--text-secondary); margin-bottom:12px; line-height:1.5; }
+.step-check { position:absolute; top:14px; right:14px; font-size:16px; color:var(--green-text); display:none; }
+.step.complete .step-check { display:block; }
+
+/* DROP ZONE */
+.drop-zone { border:1.5px dashed var(--border-med); border-radius:var(--radius-md); padding:1.5rem; text-align:center; cursor:pointer; transition:background 0.15s,border-color 0.15s; }
+.drop-zone:hover,.drop-zone.drag-over { background:var(--bg-secondary); border-color:var(--blue-border); }
+.drop-zone p { font-size:13px; color:var(--text-secondary); }
+.drop-zone small { font-size:11px; color:var(--text-tertiary); }
+.drop-zone.loaded { border-style:solid; border-color:var(--green-border); background:var(--green-bg); }
+.drop-zone.loaded p { color:var(--green-text); font-weight:500; }
+
+/* FIELD CONFIG TABLE */
+.field-table { width:100%; border-collapse:collapse; font-size:13px; margin-top:1rem; }
+.field-table th { text-align:left; padding:8px 10px; font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-tertiary); border-bottom:0.5px solid var(--border); }
+.field-table td { padding:8px 10px; border-bottom:0.5px solid var(--border); vertical-align:middle; }
+.field-table tr:last-child td { border-bottom:none; }
+.field-table tr:hover td { background:var(--bg-secondary); }
+.field-name { font-weight:500; }
+.field-source { font-size:11px; color:var(--text-tertiary); font-family:var(--font-mono); }
+.toggle-sw { position:relative; display:inline-block; width:34px; height:20px; }
+.toggle-sw input { opacity:0; width:0; height:0; }
+.toggle-slider { position:absolute; inset:0; background:var(--bg-tertiary); border:0.5px solid var(--border-med); border-radius:20px; cursor:pointer; transition:0.2s; }
+.toggle-slider:before { content:''; position:absolute; width:14px; height:14px; left:2px; top:2px; background:var(--text-tertiary); border-radius:50%; transition:0.2s; }
+.toggle-sw input:checked + .toggle-slider { background:var(--green-bg); border-color:var(--green-border); }
+.toggle-sw input:checked + .toggle-slider:before { transform:translateX(14px); background:var(--green-text); }
+.options-input { width:100%; background:var(--bg-secondary); border:0.5px solid var(--border-med); border-radius:var(--radius-sm); padding:4px 8px; font-size:12px; font-family:var(--font); color:var(--text-primary); outline:none; }
+.options-input:focus { border-color:var(--blue-border); }
+.type-select { background:var(--bg-secondary); border:0.5px solid var(--border-med); border-radius:var(--radius-sm); padding:4px 8px; font-size:12px; font-family:var(--font); color:var(--text-primary); outline:none; }
+
+/* VENDOR FORM */
+.vendor-header { margin-bottom:2rem; }
+.vendor-header h2 { font-size:20px; font-weight:500; margin-bottom:6px; }
+.vendor-header p { font-size:14px; color:var(--text-secondary); line-height:1.6; }
+
+.progress-bar-wrap { background:var(--bg-tertiary); border-radius:20px; height:6px; margin:1rem 0; overflow:hidden; }
+.progress-bar-fill { height:100%; background:var(--brand); border-radius:20px; transition:width 0.3s; }
+.progress-label { font-size:12px; color:var(--text-secondary); margin-bottom:4px; }
+
+.model-block { background:var(--bg); border:0.5px solid var(--border); border-radius:var(--radius-xl); margin-bottom:1.5rem; overflow:hidden; }
+.model-header { padding:16px 20px; background:var(--bg-secondary); border-bottom:0.5px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.model-tag { font-size:11px; font-weight:500; background:var(--blue-bg); color:var(--blue-text); padding:2px 9px; border-radius:20px; }
+.model-name { font-size:15px; font-weight:500; }
+.model-meta { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+
+.model-fields { padding:20px; border-bottom:0.5px solid var(--border); }
+.model-fields h4 { font-size:12px; font-weight:500; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-secondary); margin-bottom:14px; }
+
+.sku-block { border-top:0.5px solid var(--border); }
+.sku-header { padding:12px 20px; background:var(--bg-tertiary); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.sku-tag { font-size:11px; font-weight:500; background:var(--amber-bg); color:var(--amber-text); padding:2px 9px; border-radius:20px; }
+.sku-name { font-size:13px; font-weight:500; }
+.sku-fields { padding:16px 20px; }
+
+/* FORM FIELDS */
+.field-group { margin-bottom:16px; }
+.field-label { font-size:13px; font-weight:500; margin-bottom:5px; display:flex; align-items:center; gap:6px; }
+.required-star { color:var(--red-text); font-size:14px; }
+.field-hint { font-size:11px; color:var(--text-tertiary); margin-bottom:6px; }
+.field-input, .field-textarea, .field-select { width:100%; background:var(--bg-secondary); border:0.5px solid var(--border-med); border-radius:var(--radius-md); padding:8px 12px; font-size:13px; font-family:var(--font); color:var(--text-primary); outline:none; transition:border-color 0.15s; }
+.field-input:focus, .field-textarea:focus, .field-select:focus { border-color:var(--blue-border); background:var(--bg); }
+.field-input.error, .field-textarea.error, .field-select.error { border-color:var(--red-border); background:var(--red-bg); }
+.field-textarea { resize:vertical; min-height:80px; line-height:1.5; }
+.field-error { font-size:11px; color:var(--red-text); margin-top:4px; display:none; }
+.field-error.show { display:block; }
+
+/* BULLETS */
+.bullets-wrap { display:flex; flex-direction:column; gap:6px; }
+.bullet-row { display:flex; align-items:center; gap:8px; }
+.bullet-num { font-size:12px; color:var(--text-tertiary); width:20px; flex-shrink:0; text-align:right; }
+.bullet-input { flex:1; background:var(--bg-secondary); border:0.5px solid var(--border-med); border-radius:var(--radius-md); padding:7px 11px; font-size:13px; font-family:var(--font); color:var(--text-primary); outline:none; }
+.bullet-input:focus { border-color:var(--blue-border); background:var(--bg); }
+.bullet-remove { background:none; border:none; cursor:pointer; color:var(--text-tertiary); font-size:16px; padding:2px 4px; }
+.bullet-remove:hover { color:var(--red-text); }
+.add-bullet-btn { font-size:12px; color:var(--blue-text); background:none; border:none; cursor:pointer; padding:4px 0; display:flex; align-items:center; gap:4px; }
+.add-bullet-btn:hover { text-decoration:underline; }
+
+/* IMAGE UPLOAD */
+.image-upload-zone { border:1.5px dashed var(--border-med); border-radius:var(--radius-md); padding:1rem; cursor:pointer; transition:background 0.15s; text-align:center; }
+.image-upload-zone:hover { background:var(--bg-secondary); border-color:var(--blue-border); }
+.image-upload-zone p { font-size:13px; color:var(--text-secondary); }
+.image-upload-zone small { font-size:11px; color:var(--text-tertiary); }
+.image-list { margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; }
+.image-chip { display:inline-flex; align-items:center; gap:6px; background:var(--blue-bg); border:0.5px solid var(--blue-border); border-radius:var(--radius-md); padding:4px 10px; font-size:12px; color:var(--blue-text); }
+.image-chip-remove { background:none; border:none; cursor:pointer; color:var(--blue-text); font-size:14px; line-height:1; padding:0; }
+.image-chip-remove:hover { color:var(--red-text); }
+.image-preview { width:48px; height:48px; object-fit:cover; border-radius:var(--radius-sm); border:0.5px solid var(--border); }
+
+/* FIELDS GRID */
+.fields-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media(max-width:560px){.fields-grid{grid-template-columns:1fr;}}
+
+/* SUBMIT */
+.submit-bar { background:var(--bg); border:0.5px solid var(--border); border-radius:var(--radius-lg); padding:1.25rem 1.5rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; position:sticky; bottom:1rem; box-shadow:0 4px 16px rgba(0,0,0,0.08); }
+.submit-bar p { font-size:13px; color:var(--text-secondary); }
+.submit-bar strong { color:var(--text-primary); }
+
+/* TOAST */
+.toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(20px); background:var(--text-primary); color:var(--bg); padding:10px 20px; border-radius:var(--radius-lg); font-size:13px; opacity:0; transition:opacity 0.2s,transform 0.2s; pointer-events:none; z-index:999; white-space:nowrap; }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* MISC */
+.section-title { font-size:18px; font-weight:500; margin-bottom:4px; }
+.section-sub { font-size:13px; color:var(--text-secondary); margin-bottom:1.5rem; }
+.divider { height:0.5px; background:var(--border); margin:1.5rem 0; }
+.badge { display:inline-block; font-size:11px; font-weight:500; padding:2px 8px; border-radius:var(--radius-md); }
+.badge-req { background:var(--red-bg); color:var(--red-text); }
+.badge-opt { background:var(--gray-bg); color:var(--gray-text); }
+.empty-state { text-align:center; padding:3rem 1rem; color:var(--text-secondary); font-size:14px; }
+input[type="file"].hidden { display:none; }
+
+.vendor-info-bar { background:var(--amber-bg); border:0.5px solid var(--amber-border); border-radius:var(--radius-lg); padding:12px 16px; margin-bottom:1.5rem; display:flex; align-items:center; gap:10px; font-size:13px; color:var(--amber-text); }
+
+/* VENDOR IDENTITY CARD */
+.vendor-card { background:var(--bg); border:0.5px solid var(--border); border-radius:var(--radius-lg); padding:1.25rem 1.5rem; margin-bottom:1.5rem; }
+.vendor-card-title { font-size:14px; font-weight:500; margin-bottom:4px; }
+.vendor-card-sub { font-size:12px; color:var(--text-secondary); margin-bottom:1rem; }
+.vendor-card-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media(max-width:560px){.vendor-card-grid{grid-template-columns:1fr;}}
+
+/* IMAGE REQUIREMENTS BANNER */
+.img-req-banner { background:var(--blue-bg); border:0.5px solid var(--blue-border); border-radius:var(--radius-md); padding:10px 14px; margin-bottom:10px; }
+.img-req-title { font-size:12px; font-weight:500; color:var(--blue-text); margin-bottom:4px; display:flex; align-items:center; gap:6px; }
+.img-req-list { font-size:12px; color:var(--blue-text); line-height:1.7; }
+.img-req-list li { list-style:none; display:flex; align-items:center; gap:6px; }
+.img-req-list li::before { content:''; width:4px; height:4px; border-radius:50%; background:var(--blue-border); flex-shrink:0; }
+
+/* REVIEW MODE */
+.review-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:center; justify-content:center; }
+.review-overlay.open { display:flex; }
+.review-panel { background:var(--bg); border-radius:var(--radius-lg); width:min(700px,95vw); max-height:88vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.18); }
+.review-panel-header { padding:18px 20px 14px; border-bottom:0.5px solid var(--border); display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; background:var(--bg); z-index:1; }
+.review-panel-header h2 { font-size:16px; font-weight:500; }
+.review-body { padding:20px; }
+.review-field { background:var(--bg-secondary); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:10px; }
+.review-field-label { font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-tertiary); margin-bottom:4px; }
+.review-field-val { font-size:13px; color:var(--text-primary); margin-bottom:8px; line-height:1.5; white-space:pre-wrap; }
+.review-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.review-approve { font-size:12px; padding:4px 12px; border-radius:var(--radius-md); border:0.5px solid var(--green-border); background:var(--green-bg); color:var(--green-text); cursor:pointer; font-family:var(--font); }
+.review-reject  { font-size:12px; padding:4px 12px; border-radius:var(--radius-md); border:0.5px solid var(--red-border);   background:var(--red-bg);   color:var(--red-text);   cursor:pointer; font-family:var(--font); }
+.review-approve.active { background:var(--green-text); color:#fff; }
+.review-reject.active  { background:var(--red-text);   color:#fff; }
+.review-comment { flex:1; min-width:160px; background:var(--bg); border:0.5px solid var(--border-med); border-radius:var(--radius-md); padding:5px 9px; font-size:12px; font-family:var(--font); color:var(--text-primary); outline:none; height:30px; }
+.review-comment:focus { border-color:var(--blue-border); }
+.review-status-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.rsd-approved { background:var(--green-border); }
+.rsd-rejected  { background:var(--red-border); }
+.rsd-pending   { background:var(--gray-border); }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-brand">
+    <div class="nav-logo">Q</div>
+    <div>
+      <div class="nav-title">QBP Vendor Content Portal</div>
+      <div class="nav-subtitle" id="nav-sub">Content submission tool</div>
+    </div>
+  </div>
+  <div class="nav-right">
+    <span class="mode-badge" id="mode-badge">—</span>
+    <button class="btn btn-sm" id="mode-toggle-btn" onclick="toggleMode()"></button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- ADMIN VIEW -->
+  <div id="admin-view">
+    <div style="margin-bottom:1.5rem">
+      <div class="section-title">Template setup</div>
+      <div class="section-sub">Upload your Enterworks export templates to build the vendor submission form. Configure which fields are required and add dropdown options.</div>
+    </div>
+
+    <div class="steps">
+      <div class="step" id="step1">
+        <div class="step-check">&#10003;</div>
+        <div class="step-num">1</div>
+        <div class="step-title">Upload copy audit template</div>
+        <div class="step-desc">The Enterworks copy audit export with SKU, model descriptions, and bullet fields.</div>
+        <div class="drop-zone" id="copy-drop" onclick="document.getElementById('copy-file').click()">
+          <p id="copy-drop-label">Click or drop .xlsx file</p>
+          <small>Copy audit export template</small>
+        </div>
+        <input type="file" class="hidden" id="copy-file" accept=".xlsx">
+      </div>
+      <div class="step" id="step2">
+        <div class="step-check">&#10003;</div>
+        <div class="step-num">2</div>
+        <div class="step-title">Upload attribute template</div>
+        <div class="step-desc">The category attribute export with product specs like color, material, weight, etc.</div>
+        <div class="drop-zone" id="attr-drop" onclick="document.getElementById('attr-file').click()">
+          <p id="attr-drop-label">Click or drop .xlsx file</p>
+          <small>Attribute export template</small>
+        </div>
+        <input type="file" class="hidden" id="attr-file" accept=".xlsx">
+      </div>
+    </div>
+
+    <div id="field-config" style="display:none">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:10px">
+          <div>
+            <div class="card-title">Configure fields</div>
+            <div class="card-sub">Set which fields are required, add dropdown options, and choose input types. Vendors will see clean labels without internal codes.</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm" onclick="addCustomField()">+ Custom field</button>
+            <button class="btn btn-primary" id="launch-btn" onclick="launchVendorView()">Launch vendor form &#8594;</button>
+          </div>
+        </div>
+
+        <div id="portal-name-row" style="margin-bottom:1rem">
+          <label style="font-size:13px;font-weight:500;display:block;margin-bottom:5px">Portal title shown to vendors</label>
+          <input type="text" id="portal-title" class="field-input" value="Product Content Submission" style="max-width:400px">
+          <label style="font-size:13px;font-weight:500;display:block;margin:10px 0 5px">Instructions for vendors</label>
+          <textarea id="portal-instructions" class="field-textarea" style="max-width:600px;min-height:64px" placeholder="e.g. Please complete all required fields for each SKU. Upload at least one hero image per model."></textarea>
+          <label style="font-size:13px;font-weight:500;display:block;margin:10px 0 5px">Image requirements <span style="font-weight:400;color:var(--text-tertiary)">(shown to vendors above each image upload)</span></label>
+          <textarea id="portal-img-requirements" class="field-textarea" style="max-width:600px;min-height:64px">Minimum Image Requirements:
+1920 x 1280 pixels @ 300 dpi
+File formats accepted: JPG, PNG, TIFF
+White or neutral background preferred
+No watermarks or logos</textarea>
+          <label style="font-size:13px;font-weight:500;display:block;margin:10px 0 5px">QBP contact email <span style="font-weight:400;color:var(--text-tertiary)">(shown to vendors on the submission confirmation)</span></label>
+          <input type="text" id="portal-contact-email" class="field-input" value="" placeholder="e.g. content@qbp.com" style="max-width:300px">
+        </div>
+
+        <table class="field-table" id="field-config-table">
+          <thead>
+            <tr>
+              <th style="width:24%">Field name</th>
+              <th style="width:12%">Source</th>
+              <th style="width:14%">Input type</th>
+              <th style="width:8%">Required</th>
+              <th style="width:8%">Images</th>
+              <th>Dropdown options <span style="font-weight:400;text-transform:none;letter-spacing:0">(comma-separated)</span></th>
+            </tr>
+          </thead>
+          <tbody id="field-config-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- VENDOR VIEW -->
+  <div id="vendor-view" style="display:none">
+    <div class="vendor-info-bar" id="vendor-info-bar" style="display:none">
+      &#9888; You are previewing the vendor form as an admin. &nbsp;
+      <button class="btn btn-sm" onclick="openReview()" style="margin-left:auto">&#128065; Review mode</button>
+    </div>
+
+    <div class="vendor-header">
+      <h2 id="vendor-title">Product Content Submission</h2>
+      <p id="vendor-instructions"></p>
+    </div>
+
+    <!-- VENDOR IDENTITY CARD -->
+    <div class="vendor-card" id="vendor-identity-card">
+      <div class="vendor-card-title">Your contact information</div>
+      <div class="vendor-card-sub">This will be included with your submission so our team knows who sent it.</div>
+      <div class="vendor-card-grid">
+        <div class="field-group" style="margin-bottom:0">
+          <div class="field-label">Your name <span class="required-star">*</span></div>
+          <input type="text" class="field-input" id="vendor-name" placeholder="First and last name" oninput="updateProgress()">
+          <div class="field-error" id="err-vendor-name">Please enter your name</div>
+        </div>
+        <div class="field-group" style="margin-bottom:0">
+          <div class="field-label">Your email <span class="required-star">*</span></div>
+          <input type="email" class="field-input" id="vendor-email" placeholder="you@yourcompany.com" oninput="updateProgress()">
+          <div class="field-error" id="err-vendor-email">Please enter your email</div>
+        </div>
+        <div class="field-group" style="margin-bottom:0">
+          <div class="field-label">Company / brand name</div>
+          <input type="text" class="field-input" id="vendor-company" placeholder="Your company name">
+        </div>
+        <div class="field-group" style="margin-bottom:0">
+          <div class="field-label">Phone <span style="font-size:11px;color:var(--text-tertiary);font-weight:400">(optional)</span></div>
+          <input type="tel" class="field-input" id="vendor-phone" placeholder="555-555-5555">
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:1.5rem">
+      <div class="progress-label" id="progress-label">0 of 0 required fields complete</div>
+      <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+    </div>
+
+    <div id="vendor-form"></div>
+
+    <div class="submit-bar">
+      <p><strong id="submit-summary"></strong></p>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="saveDraft()">&#8595; Save draft</button>
+        <button class="btn btn-primary" onclick="submitForm()">&#8615; Download submission</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- REVIEW OVERLAY -->
+<div class="review-overlay" id="review-overlay" onclick="maybeCloseReview(event)">
+  <div class="review-panel">
+    <div class="review-panel-header">
+      <div>
+        <h2>Review submission</h2>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px" id="review-vendor-label"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-sm btn-primary" onclick="exportReview()">&#8615; Export review</button>
+        <button class="btn btn-sm" onclick="closeReview()">&#10005;</button>
+      </div>
+    </div>
+    <div class="review-body" id="review-body"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ── STATE ─────────────────────────────────────────────────────── */
+let mode = 'admin'; // admin | vendor
+let copyData = null; // parsed copy audit rows
+let attrData = null; // parsed attribute rows
+let fields   = [];   // unified field config
+let models   = [];   // [{modelCode, modelDesc, skus:[{sku,name,...}]}]
+let formData = {};   // {modelCode:{fieldKey:val}, sku:{fieldKey:val, images:[]}}
+let isPreview = false;
+
+/* ── MODE TOGGLE ───────────────────────────────────────────────── */
+function setMode(m) {
+  mode = m;
+  document.getElementById('admin-view').style.display  = m==='admin'  ? 'block' : 'none';
+  document.getElementById('vendor-view').style.display = m==='vendor' ? 'block' : 'none';
+  document.getElementById('mode-badge').textContent    = m==='admin'  ? 'Admin'  : 'Vendor view';
+  document.getElementById('mode-badge').className      = 'mode-badge ' + (m==='admin' ? 'mode-admin' : 'mode-vendor');
+  document.getElementById('mode-toggle-btn').textContent = m==='admin' ? 'Switch to vendor view' : '&#8592; Back to admin';
+  document.getElementById('nav-sub').textContent = m==='admin' ? 'Template configuration' : 'Vendor submission form';
+}
+function toggleMode() {
+  if (mode==='admin') launchVendorView(true);
+  else { isPreview=false; setMode('admin'); }
+}
+
+/* ── FILE READING ──────────────────────────────────────────────── */
+function readXLSX(file, cb) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb   = XLSX.read(e.target.result, {type:'binary'});
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, {raw:false});
+    cb(rows, wb);
+  };
+  reader.readAsBinaryString(file);
+}
+
+function cleanColName(col) {
+  return col.includes('___') ? col.split('___')[0] : col;
+}
+
+/* ── TEMPLATE PROCESSING ───────────────────────────────────────── */
+function processCopy(rows) {
+  copyData = rows;
+  document.getElementById('copy-drop').classList.add('loaded');
+  document.getElementById('copy-drop-label').textContent = '&#10003; ' + rows.length + ' SKUs loaded';
+  document.getElementById('step1').classList.add('complete');
+  tryBuildFields();
+}
+
+function processAttr(rows) {
+  attrData = rows;
+  document.getElementById('attr-drop').classList.add('loaded');
+  document.getElementById('attr-drop-label').textContent = '&#10003; ' + rows.length + ' SKUs loaded';
+  document.getElementById('step2').classList.add('complete');
+  tryBuildFields();
+}
+
+function tryBuildFields() {
+  if (!copyData || !attrData) return;
+  buildModels();
+  buildFieldConfig();
+  document.getElementById('field-config').style.display = 'block';
+}
+
+function buildModels() {
+  const modelMap = {};
+  copyData.forEach(r => {
+    const mc = r['Model Code'] || 'Unknown';
+    if (!modelMap[mc]) modelMap[mc] = { modelCode:mc, modelDesc:r['Model Description']||'', skus:[] };
+    modelMap[mc].skus.push({
+      sku:  r['SKU']||'',
+      name: r['Name']||'',
+      existingModelBullets: r['Model Bullet Text']||'',
+      existingSkuBullets:   r['SKU Bullet Text']||''
+    });
+  });
+  models = Object.values(modelMap);
+}
+
+const COPY_FIELDS = [
+  { key:'model_description', label:'Model description',    source:'copy',  type:'textarea', level:'model', required:true,  hint:'A 1-3 sentence overview of the model. Used on all SKUs in this model.' },
+  { key:'model_bullets',     label:'Model feature bullets', source:'copy',  type:'bullets',  level:'model', required:true,  hint:'Key features that apply to the entire model. Add up to 10 bullets.' },
+  { key:'sku_bullets',       label:'SKU-specific bullets',  source:'copy',  type:'bullets',  level:'sku',   required:false, hint:'Features unique to this specific SKU (color, size-specific details). Optional.' },
+];
+
+const SYSTEM_SKIP = new Set(['SKU','Name','Brand description','Taxonomy Node','Model Code','Model Description','Model Bullet Text','Model Bullet Order','SKU Bullet Text','SKU Bullet Order','Manufacturer Part Number','Discontinued']);
+
+const ATTR_DROPDOWN_HINTS = {
+  'Color':        'Black, White, Silver, Red, Blue, Green, Yellow, Orange, Purple, Pink, Gray, Titanium, Natural',
+  'Defined Color':'Black, White, Silver, Red, Blue, Green, Yellow, Orange, Purple, Pink, Gray, Titanium, Natural',
+  'Mount Type':   'Bolt-On, Cage Mount, Side Entry, Top Entry',
+  'Bottle Type':  'Standard, Wide Mouth, Slim, Insulated',
+  'Access Style': 'Top Load, Side Load, Front Load',
+  'Material':     'Carbon Fiber, Aluminum, Plastic, Nylon, Steel, Titanium',
+  'Discontinued': 'Yes, No',
+};
+
+function buildFieldConfig() {
+  // Combine copy fields + attr fields, skip system cols
+  const attrFields = Object.keys(attrData[0]||{})
+    .filter(col => !SYSTEM_SKIP.has(col) && !SYSTEM_SKIP.has(cleanColName(col)))
+    .map(col => {
+      const options = ATTR_DROPDOWN_HINTS[cleanColName(col)] || '';
+      return {
+        key:      'attr_' + col.replace(/[^a-z0-9]/gi,'_'),
+        label:    cleanColName(col),
+        origCol:  col,
+        source:   'attr',
+        type:     options ? 'select' : 'text',
+        level:    'sku',
+        required: false,
+        hint:     '',
+        options
+      };
+    });
+
+  // Add image upload as last model-level field
+  const imageField = { key:'images', label:'Product images', source:'system', type:'images', level:'sku', required:false, hint:'Upload product images for this SKU. File names will be logged in the export.' };
+
+  fields = [
+    ...COPY_FIELDS.map(f=>({...f, options:'', origCol: f.key==='model_description'?'Model Description':f.key==='model_bullets'?'Model Bullet Text':'SKU Bullet Text'})),
+    ...attrFields,
+    imageField
+  ];
+
+  renderFieldConfig();
+}
+
+function renderFieldConfig() {
+  const tbody = document.getElementById('field-config-body');
+  tbody.innerHTML = fields.map((f,i) => `
+    <tr>
+      <td>
+        <div class="field-name">${f.label}</div>
+        ${f.source!=='system'?`<div class="field-source">${f.origCol||f.key}</div>`:''}
+      </td>
+      <td><span class="badge ${f.source==='copy'?'badge-opt':f.source==='system'?'badge-opt':'badge-opt'}" style="background:var(--${f.source==='copy'?'blue':f.source==='attr'?'amber':'gray'}-bg);color:var(--${f.source==='copy'?'blue':f.source==='attr'?'amber':'gray'}-text)">${f.source}</span></td>
+      <td>
+        ${f.type==='images'||f.type==='bullets'?`<span style="font-size:12px;color:var(--text-secondary)">${f.type}</span>`:`
+        <select class="type-select" onchange="fields[${i}].type=this.value">
+          <option value="text" ${f.type==='text'?'selected':''}>Text</option>
+          <option value="textarea" ${f.type==='textarea'?'selected':''}>Textarea</option>
+          <option value="select" ${f.type==='select'?'selected':''}>Dropdown</option>
+          <option value="number" ${f.type==='number'?'selected':''}>Number</option>
+        </select>`}
+      </td>
+      <td style="text-align:center">
+        <label class="toggle-sw"><input type="checkbox" ${f.required?'checked':''} onchange="fields[${i}].required=this.checked"><span class="toggle-slider"></span></label>
+      </td>
+      <td style="text-align:center">
+        ${f.type!=='images'?`<label class="toggle-sw"><input type="checkbox" ${f.hasImages?'checked':''} onchange="fields[${i}].hasImages=this.checked"><span class="toggle-slider"></span></label>`:'<span style="font-size:12px;color:var(--text-tertiary)">—</span>'}
+      </td>
+      <td>${f.type==='images'||f.type==='bullets'?`<span style="font-size:12px;color:var(--text-tertiary)">n/a</span>`:`<input class="options-input" value="${f.options||''}" placeholder="e.g. Option 1, Option 2" oninput="fields[${i}].options=this.value;fields[${i}].type=this.value.length>0?'select':fields[${i}].type">`}</td>
+    </tr>`).join('');
+}
+
+function addCustomField() {
+  fields.push({ key:'custom_'+Date.now(), label:'Custom field', source:'custom', type:'text', level:'sku', required:false, options:'', hint:'' });
+  renderFieldConfig();
+}
+
+/* ── VENDOR FORM ───────────────────────────────────────────────── */
+function launchVendorView(preview=false) {
+  if (!copyData || !attrData) { showToast('Please upload both templates first'); return; }
+  isPreview = preview;
+  document.getElementById('vendor-info-bar').style.display = preview ? 'flex' : 'none';
+  document.getElementById('vendor-title').textContent = document.getElementById('portal-title').value || 'Product Content Submission';
+  const inst = document.getElementById('portal-instructions').value;
+  document.getElementById('vendor-instructions').textContent = inst || 'Please complete all fields below for each product. Required fields are marked with a red asterisk.';
+  // Update image field hint with requirements
+  const imgReqs = document.getElementById('portal-img-requirements').value;
+  const imgField = fields.find(f=>f.key==='images');
+  if (imgField && imgReqs) imgField.imgRequirements = imgReqs;
+  renderVendorForm();
+  setMode('vendor');
+}
+
+function getFormVal(scope, key) {
+  return (formData[scope] && formData[scope][key]) || '';
+}
+function setFormVal(scope, key, val) {
+  if (!formData[scope]) formData[scope] = {};
+  formData[scope][key] = val;
+  updateProgress();
+}
+
+function renderVendorForm() {
+  const modelFields = fields.filter(f=>f.level==='model' && f.type!=='images');
+  const skuFields   = fields.filter(f=>f.level==='sku');
+
+  let html = models.map(m => {
+    const mScope = 'model_' + m.modelCode;
+    const mFieldsHtml = modelFields.map(f => renderField(f, mScope, m)).join('');
+    const skusHtml = m.skus.map(s => {
+      const sScope = 'sku_' + s.sku;
+      const sFieldsHtml = skuFields.map(f => renderField(f, sScope, s)).join('');
+      return `
+      <div class="sku-block">
+        <div class="sku-header">
+          <span class="sku-tag">SKU</span>
+          <span class="sku-name">${s.name}</span>
+          <span style="font-size:12px;color:var(--text-tertiary);font-family:var(--font-mono)">${s.sku}</span>
+        </div>
+        <div class="sku-fields">
+          <div class="fields-grid">${sFieldsHtml}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `
+    <div class="model-block">
+      <div class="model-header">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span class="model-tag">MODEL</span><span style="font-size:12px;color:var(--text-secondary);font-family:var(--font-mono)">${m.modelCode}</span></div>
+          <div class="model-name">${m.modelDesc ? m.modelDesc.substring(0,80)+'...' : 'Model '+m.modelCode}</div>
+          <div class="model-meta">${m.skus.length} SKU${m.skus.length!==1?'s':''}: ${m.skus.map(s=>s.sku).join(', ')}</div>
+        </div>
+      </div>
+      ${mFieldsHtml ? `<div class="model-fields"><h4>Model-level content <span style="font-weight:400;font-size:11px;color:var(--text-tertiary)">(applies to all SKUs in this model)</span></h4><div>${mFieldsHtml}</div></div>` : ''}
+      ${skusHtml}
+    </div>`;
+  }).join('');
+
+  document.getElementById('vendor-form').innerHTML = html;
+  updateProgress();
+}
+
+function renderField(f, scope, context) {
+  const val = getFormVal(scope, f.key);
+  const reqStar = f.required ? '<span class="required-star">*</span>' : '';
+  const hint = f.hint ? `<div class="field-hint">${f.hint}</div>` : '';
+  let input = '';
+
+  if (f.type === 'bullets') {
+    const existing = f.key==='model_bullets' ? (context.existingModelBullets||'') : (context.existingSkuBullets||'');
+    const bullets = val ? val : (existing ? existing.split('~') : ['','','']);
+    const bulletsArr = Array.isArray(bullets) ? bullets : (typeof bullets==='string' ? [bullets] : ['','','']);
+    const bulletRows = bulletsArr.map((b,bi) => `
+      <div class="bullet-row" id="bullet-row-${scope}-${f.key}-${bi}">
+        <span class="bullet-num">${bi+1}.</span>
+        <input class="bullet-input" value="${escHtml(b)}" placeholder="Feature bullet ${bi+1}..."
+          oninput="updateBullet('${scope}','${f.key}',${bi},this.value)"
+          data-scope="${scope}" data-field="${f.key}" data-idx="${bi}">
+        <button class="bullet-remove" onclick="removeBullet('${scope}','${f.key}',${bi})" title="Remove">&#215;</button>
+      </div>`).join('');
+    input = `<div class="bullets-wrap" id="bullets-${scope}-${f.key}">${bulletRows}</div>
+      <button class="add-bullet-btn" onclick="addBullet('${scope}','${f.key}')">+ Add bullet</button>`;
+
+  } else if (f.type === 'images') {
+    const imgs = (formData[scope] && formData[scope]['__images']) || [];
+    const chips = imgs.map((img,ii) => `
+      <div class="image-chip">
+        ${img.dataUrl ? `<img src="${img.dataUrl}" class="image-preview">` : ''}
+        <span>${img.name}</span>
+        <button class="image-chip-remove" onclick="removeImage('${scope}',${ii})">&#215;</button>
+      </div>`).join('');
+    const reqsHtml = f.imgRequirements ? `
+      <div class="img-req-banner">
+        <div class="img-req-title">&#128247; Image requirements</div>
+        <ul class="img-req-list">${f.imgRequirements.split('\n').filter(l=>l.trim()).map(l=>`<li>${l.trim()}</li>`).join('')}</ul>
+      </div>` : '';
+    input = `
+      ${reqsHtml}
+      <div class="image-upload-zone" onclick="document.getElementById('img-${scope}').click()">
+        <p>Click to upload images</p>
+        <small>JPG, PNG, WEBP, TIFF accepted &nbsp;·&nbsp; Multiple files allowed</small>
+      </div>
+      <input type="file" class="hidden" id="img-${scope}" multiple accept="image/*" onchange="handleImages('${scope}',this)">
+      ${imgs.length ? `<div class="image-list">${chips}</div>` : `<div id="imglist-${scope}"></div>`}`;
+
+  } else if (f.type === 'textarea') {
+    input = `<textarea class="field-textarea" id="field-${scope}-${f.key}" oninput="setFormVal('${scope}','${f.key}',this.value)" placeholder="Enter ${f.label.toLowerCase()}...">${escHtml(val)}</textarea>`;
+
+  } else if (f.type === 'select' || f.options) {
+    const opts = (f.options||'').split(',').map(o=>o.trim()).filter(Boolean);
+    const optHtml = ['', ...opts].map(o=>`<option value="${escHtml(o)}" ${val===o?'selected':''}>${o||'— Select —'}</option>`).join('');
+    input = `<select class="field-select" id="field-${scope}-${f.key}" onchange="setFormVal('${scope}','${f.key}',this.value)">${optHtml}</select>`;
+
+  } else if (f.type === 'number') {
+    input = `<input type="number" class="field-input" id="field-${scope}-${f.key}" value="${escHtml(val)}" oninput="setFormVal('${scope}','${f.key}',this.value)" placeholder="0">`;
+
+  } else {
+    input = `<input type="text" class="field-input" id="field-${scope}-${f.key}" value="${escHtml(val)}" oninput="setFormVal('${scope}','${f.key}',this.value)" placeholder="Enter ${f.label.toLowerCase()}...">`;
+  }
+
+  const fullWidth = f.type==='textarea'||f.type==='bullets'||f.type==='images';
+  const wrap = fullWidth ? '' : '';
+  return `<div class="field-group${fullWidth?' style="grid-column:1/-1"':''}" ${fullWidth?'style="grid-column:1/-1"':''}>
+    <div class="field-label">${f.label} ${reqStar}</div>
+    ${hint}
+    ${input}
+    <div class="field-error" id="err-${scope}-${f.key}">This field is required</div>
+  </div>`;
+}
+
+/* ── BULLETS ───────────────────────────────────────────────────── */
+function getBullets(scope, key) {
+  const val = getFormVal(scope, key);
+  if (!val) return ['','',''];
+  return Array.isArray(val) ? val : (typeof val==='string'&&val.includes('~') ? val.split('~') : [val]);
+}
+function updateBullet(scope, key, idx, val) {
+  const bullets = getBullets(scope, key);
+  bullets[idx] = val;
+  setFormVal(scope, key, bullets);
+}
+function addBullet(scope, key) {
+  const bullets = getBullets(scope, key);
+  bullets.push('');
+  setFormVal(scope, key, bullets);
+  renderVendorForm();
+  setTimeout(()=>{ const inputs=document.querySelectorAll(`[data-scope="${scope}"][data-field="${key}"]`); if(inputs.length) inputs[inputs.length-1].focus(); },50);
+}
+function removeBullet(scope, key, idx) {
+  const bullets = getBullets(scope, key);
+  bullets.splice(idx,1);
+  setFormVal(scope, key, bullets);
+  renderVendorForm();
+}
+
+/* ── IMAGES ────────────────────────────────────────────────────── */
+function handleImages(scope, input) {
+  if (!formData[scope]) formData[scope]={};
+  if (!formData[scope]['__images']) formData[scope]['__images']=[];
+  const files = Array.from(input.files);
+  let loaded = 0;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      formData[scope]['__images'].push({ name:file.name, dataUrl:e.target.result });
+      loaded++;
+      if (loaded===files.length) renderVendorForm();
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value='';
+}
+function removeImage(scope, idx) {
+  if (formData[scope] && formData[scope]['__images']) {
+    formData[scope]['__images'].splice(idx,1);
+    renderVendorForm();
+  }
+}
+
+/* ── PROGRESS ──────────────────────────────────────────────────── */
+function updateProgress() {
+  const reqFields = fields.filter(f=>f.required && f.type!=='images');
+  let total=2, complete=0; // start at 2 for name+email
+  // Check vendor identity
+  const vname = (document.getElementById('vendor-name')||{}).value||'';
+  const vemail = (document.getElementById('vendor-email')||{}).value||'';
+  if(vname.trim()) complete++;
+  if(vemail.trim()) complete++;
+
+  models.forEach(m => {
+    const mScope='model_'+m.modelCode;
+    reqFields.filter(f=>f.level==='model').forEach(f=>{
+      total++;
+      const v=getFormVal(mScope,f.key);
+      if(f.type==='bullets'){const b=getBullets(mScope,f.key);if(b.some(x=>x.trim()))complete++;}
+      else if(v&&v.toString().trim()) complete++;
+    });
+    m.skus.forEach(s=>{
+      const sScope='sku_'+s.sku;
+      reqFields.filter(f=>f.level==='sku').forEach(f=>{
+        total++;
+        const v=getFormVal(sScope,f.key);
+        if(f.type==='bullets'){const b=getBullets(sScope,f.key);if(b.some(x=>x.trim()))complete++;}
+        else if(v&&v.toString().trim()) complete++;
+      });
+    });
+  });
+  const pct = total>0 ? Math.round(complete/total*100) : 0;
+  document.getElementById('progress-fill').style.width=pct+'%';
+  document.getElementById('progress-label').textContent=`${complete} of ${total} required fields complete`;
+  const totalSkus = models.reduce((a,m)=>a+m.skus.length,0);
+  document.getElementById('submit-summary').textContent=`${models.length} model${models.length!==1?'s':''}, ${totalSkus} SKU${totalSkus!==1?'s':''} · ${pct}% complete`;
+}
+
+/* ── SAVE DRAFT ────────────────────────────────────────────────── */
+function saveDraft() {
+  try {
+    const draft = JSON.stringify({formData, timestamp: new Date().toISOString()});
+    const blob = new Blob([draft],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='vendor_draft_'+new Date().toISOString().split('T')[0]+'.json'; a.click();
+    showToast('Draft saved!');
+  } catch(e) { showToast('Could not save draft'); }
+}
+
+/* ── EXPORT ────────────────────────────────────────────────────── */
+function submitForm() {
+  let hasErrors = false;
+
+  // Validate vendor identity
+  const vname  = document.getElementById('vendor-name').value.trim();
+  const vemail = document.getElementById('vendor-email').value.trim();
+  const errName  = document.getElementById('err-vendor-name');
+  const errEmail = document.getElementById('err-vendor-email');
+  const inpName  = document.getElementById('vendor-name');
+  const inpEmail = document.getElementById('vendor-email');
+  if(!vname)  { errName.classList.add('show');  inpName.classList.add('error');  hasErrors=true; }
+  else        { errName.classList.remove('show');inpName.classList.remove('error'); }
+  if(!vemail) { errEmail.classList.add('show'); inpEmail.classList.add('error'); hasErrors=true; }
+  else        { errEmail.classList.remove('show');inpEmail.classList.remove('error'); }
+
+  // Validate content fields
+  const reqFields = fields.filter(f=>f.required && f.type!=='images');
+  reqFields.forEach(f => {
+    models.forEach(m => {
+      if (f.level==='model') {
+        const scope='model_'+m.modelCode;
+        const v=getFormVal(scope,f.key);
+        const empty = f.type==='bullets' ? !getBullets(scope,f.key).some(b=>b.trim()) : !v||!v.toString().trim();
+        const el=document.getElementById(`err-${scope}-${f.key}`);
+        const inp=document.getElementById(`field-${scope}-${f.key}`);
+        if(el){el.classList.toggle('show',empty);}
+        if(inp){inp.classList.toggle('error',empty);}
+        if(empty) hasErrors=true;
+      } else {
+        m.skus.forEach(s => {
+          const scope='sku_'+s.sku;
+          const v=getFormVal(scope,f.key);
+          const empty = f.type==='bullets' ? !getBullets(scope,f.key).some(b=>b.trim()) : !v||!v.toString().trim();
+          const el=document.getElementById(`err-${scope}-${f.key}`);
+          const inp=document.getElementById(`field-${scope}-${f.key}`);
+          if(el){el.classList.toggle('show',empty);}
+          if(inp){inp.classList.toggle('error',empty);}
+          if(empty) hasErrors=true;
+        });
+      }
+    });
+  });
+
+  if (hasErrors) { showToast('Please fill in all required fields before submitting'); return; }
+
+  const submittedBy = vname;
+  const submittedEmail = vemail;
+  const submittedCompany = document.getElementById('vendor-company').value.trim();
+  const submittedPhone   = document.getElementById('vendor-phone').value.trim();
+  const submittedAt = new Date().toLocaleString();
+  const contactEmail = document.getElementById('portal-contact-email')?document.getElementById('portal-contact-email').value.trim():'';
+
+  // Build copy audit sheet
+  const copyRows = [];
+  models.forEach(m => {
+    const mScope='model_'+m.modelCode;
+    m.skus.forEach(s => {
+      const sScope='sku_'+s.sku;
+      const mBullets=getBullets(mScope,'model_bullets').filter(b=>b.trim());
+      const sBullets=getBullets(sScope,'sku_bullets').filter(b=>b.trim());
+      copyRows.push({
+        'Submitted By': submittedBy, 'Vendor Email': submittedEmail, 'Company': submittedCompany,
+        'Submitted At': submittedAt,
+        'SKU': s.sku, 'Name': s.name, 'Model Code': m.modelCode,
+        'Model Description':  getFormVal(mScope,'model_description'),
+        'Model Bullet Text':  mBullets.join('~'),
+        'Model Bullet Order': mBullets.map((_,i)=>i).join('~'),
+        'SKU Bullet Text':    sBullets.join('~'),
+        'SKU Bullet Order':   sBullets.map((_,i)=>i).join('~'),
+      });
+    });
+  });
+
+  // Build attribute sheet
+  const attrRows = [];
+  models.forEach(m => {
+    m.skus.forEach(s => {
+      const sScope='sku_'+s.sku;
+      const row = { 'Submitted By':submittedBy, 'SKU':s.sku, 'Name':s.name };
+      fields.filter(f=>f.source==='attr').forEach(f => { row[f.label] = getFormVal(sScope, f.key); });
+      attrRows.push(row);
+    });
+  });
+
+  // Build image manifest sheet
+  const imgRows = [];
+  models.forEach(m => {
+    m.skus.forEach(s => {
+      const sScope='sku_'+s.sku;
+      const imgs=(formData[sScope]&&formData[sScope]['__images'])||[];
+      if(imgs.length) {
+        imgs.forEach((img,ii) => imgRows.push({'SKU':s.sku,'Product Name':s.name,'Model Code':m.modelCode,'Image #':ii+1,'File Name':img.name,'Submitted By':submittedBy}));
+      } else {
+        imgRows.push({'SKU':s.sku,'Product Name':s.name,'Model Code':m.modelCode,'Image #':'','File Name':'No images uploaded','Submitted By':submittedBy});
+      }
+    });
+  });
+
+  // Submission info sheet
+  const infoRows = [
+    ['Field','Value'],
+    ['Submitted by', submittedBy],
+    ['Email', submittedEmail],
+    ['Company', submittedCompany],
+    ['Phone', submittedPhone],
+    ['Submitted at', submittedAt],
+    ['Portal title', document.getElementById('vendor-title').textContent],
+    ['Total models', models.length],
+    ['Total SKUs', models.reduce((a,m)=>a+m.skus.length,0)],
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const wsInfo = XLSX.utils.aoa_to_sheet(infoRows);
+  wsInfo['!cols']=[{wch:18},{wch:40}];
+  XLSX.utils.book_append_sheet(wb,wsInfo,'Submission Info');
+
+  const wsCopy = XLSX.utils.json_to_sheet(copyRows);
+  wsCopy['!cols']=[{wch:18},{wch:28},{wch:18},{wch:16},{wch:10},{wch:50},{wch:12},{wch:80},{wch:80},{wch:20},{wch:60},{wch:20}];
+  XLSX.utils.book_append_sheet(wb,wsCopy,'Copy Content');
+
+  const wsAttr = XLSX.utils.json_to_sheet(attrRows);
+  wsAttr['!cols']=[{wch:18},{wch:10},{wch:50},...fields.filter(f=>f.source==='attr').map(()=>({wch:22}))];
+  XLSX.utils.book_append_sheet(wb,wsAttr,'Attributes');
+
+  const wsImg = XLSX.utils.json_to_sheet(imgRows);
+  wsImg['!cols']=[{wch:10},{wch:50},{wch:12},{wch:8},{wch:50},{wch:18}];
+  XLSX.utils.book_append_sheet(wb,wsImg,'Image Manifest');
+
+  const safeCompany = submittedCompany.replace(/[^a-z0-9]/gi,'_')||'vendor';
+  const tag = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, `vendor_submission_${safeCompany}_${tag}.xlsx`);
+
+  // Show confirmation
+  const contactMsg = contactEmail ? ` and email it to <strong>${contactEmail}</strong>` : '';
+  showToast(`Submission downloaded! Please send the file to your QBP contact.`);
+  if(contactEmail) {
+    setTimeout(()=>{
+      document.getElementById('vendor-form').insertAdjacentHTML('afterend',`
+        <div style="background:var(--green-bg);border:0.5px solid var(--green-border);border-radius:var(--radius-lg);padding:1.25rem 1.5rem;margin-top:1rem;font-size:14px;color:var(--green-text)">
+          <strong>&#10003; Submission downloaded!</strong><br>
+          <span style="font-size:13px">Please email your submission file to <strong>${contactEmail}</strong>. Your submission has been tagged with your name and contact info.</span>
+        </div>`);
+    }, 100);
+  }
+}
+
+/* ── REVIEW MODE ───────────────────────────────────────────────── */
+let reviewData = {}; // {scope_fieldKey: {status:'approved'|'rejected'|'pending', comment:''}}
+
+function openReview() {
+  const vname  = document.getElementById('vendor-name').value.trim();
+  const vemail = document.getElementById('vendor-email').value.trim();
+  document.getElementById('review-vendor-label').textContent = vname ? `${vname}${vemail?' · '+vemail:''}` : 'No vendor info entered yet';
+  renderReviewBody();
+  document.getElementById('review-overlay').classList.add('open');
+}
+function closeReview() { document.getElementById('review-overlay').classList.remove('open'); }
+function maybeCloseReview(e) { if(e.target===document.getElementById('review-overlay')) closeReview(); }
+
+function setReview(scope, key, status) {
+  const rkey = scope+'__'+key;
+  if(!reviewData[rkey]) reviewData[rkey]={status:'pending',comment:''};
+  reviewData[rkey].status = reviewData[rkey].status===status ? 'pending' : status;
+  renderReviewBody();
+}
+function setReviewComment(scope, key, val) {
+  const rkey = scope+'__'+key;
+  if(!reviewData[rkey]) reviewData[rkey]={status:'pending',comment:''};
+  reviewData[rkey].comment = val;
+}
+
+function renderReviewBody() {
+  const contentFields = fields.filter(f=>f.type!=='images'&&f.source!=='system');
+  let html='';
+  models.forEach(m=>{
+    const mScope='model_'+m.modelCode;
+    html+=`<div style="font-size:13px;font-weight:500;color:var(--text-secondary);margin:1rem 0 8px;padding-bottom:6px;border-bottom:0.5px solid var(--border)">Model ${m.modelCode}</div>`;
+    contentFields.filter(f=>f.level==='model').forEach(f=>{
+      const val = f.type==='bullets' ? getBullets(mScope,f.key).filter(b=>b.trim()).map((b,i)=>`${i+1}. ${b}`).join('\n') : getFormVal(mScope,f.key);
+      if(!val) return;
+      html+=reviewFieldHTML(mScope, f.key, f.label, val);
+    });
+    m.skus.forEach(s=>{
+      const sScope='sku_'+s.sku;
+      html+=`<div style="font-size:12px;font-weight:500;color:var(--text-tertiary);margin:10px 0 6px;font-family:var(--font-mono)">${s.sku} · ${s.name.substring(0,50)}</div>`;
+      contentFields.filter(f=>f.level==='sku').forEach(f=>{
+        const val = f.type==='bullets' ? getBullets(sScope,f.key).filter(b=>b.trim()).map((b,i)=>`${i+1}. ${b}`).join('\n') : getFormVal(sScope,f.key);
+        if(!val) return;
+        html+=reviewFieldHTML(sScope, f.key, f.label, val);
+      });
+      // images
+      const imgs=(formData[sScope]&&formData[sScope]['__images'])||[];
+      if(imgs.length) {
+        html+=`<div class="review-field"><div class="review-field-label">Images</div><div class="review-field-val">${imgs.map(i=>i.name).join(', ')}</div></div>`;
+      }
+    });
+  });
+  if(!html) html='<div class="empty-state">No content has been entered yet.</div>';
+  document.getElementById('review-body').innerHTML=html;
+}
+
+function reviewFieldHTML(scope, key, label, val) {
+  const rkey = scope+'__'+key;
+  const rd = reviewData[rkey]||{status:'pending',comment:''};
+  const dot = rd.status==='approved'?'rsd-approved':rd.status==='rejected'?'rsd-rejected':'rsd-pending';
+  const safeComment = (rd.comment||'').replace(/"/g,'&quot;');
+  return `<div class="review-field">
+    <div class="review-field-label" style="display:flex;align-items:center;gap:6px"><div class="review-status-dot ${dot}"></div>${label}</div>
+    <div class="review-field-val">${escHtml(val)}</div>
+    <div class="review-actions">
+      <button class="review-approve${rd.status==='approved'?' active':''}" onclick="setReview('${scope}','${key}','approved')">&#10003; Approve</button>
+      <button class="review-reject${rd.status==='rejected'?' active':''}"  onclick="setReview('${scope}','${key}','rejected')">&#10005; Reject</button>
+      <input class="review-comment" placeholder="Add comment (optional)..." value="${safeComment}" oninput="setReviewComment('${scope}','${key}',this.value)">
+    </div>
+  </div>`;
+}
+
+function exportReview() {
+  const vname  = document.getElementById('vendor-name').value.trim() || 'Unknown vendor';
+  const vemail = document.getElementById('vendor-email').value.trim();
+  const contentFields = fields.filter(f=>f.type!=='images'&&f.source!=='system');
+  const rows=[];
+  models.forEach(m=>{
+    const mScope='model_'+m.modelCode;
+    contentFields.filter(f=>f.level==='model').forEach(f=>{
+      const val = f.type==='bullets'?getBullets(mScope,f.key).filter(b=>b.trim()).join(' | '):getFormVal(mScope,f.key);
+      if(!val) return;
+      const rkey=mScope+'__'+f.key;
+      const rd=reviewData[rkey]||{status:'pending',comment:''};
+      rows.push({'Vendor':vname,'Email':vemail,'SKU/Model':'Model '+m.modelCode,'Field':f.label,'Submitted Value':val,'Review Status':rd.status,'Comment':rd.comment||''});
+    });
+    m.skus.forEach(s=>{
+      const sScope='sku_'+s.sku;
+      contentFields.filter(f=>f.level==='sku').forEach(f=>{
+        const val = f.type==='bullets'?getBullets(sScope,f.key).filter(b=>b.trim()).join(' | '):getFormVal(sScope,f.key);
+        if(!val) return;
+        const rkey=sScope+'__'+f.key;
+        const rd=reviewData[rkey]||{status:'pending',comment:''};
+        rows.push({'Vendor':vname,'Email':vemail,'SKU/Model':s.sku,'Field':f.label,'Submitted Value':val,'Review Status':rd.status,'Comment':rd.comment||''});
+      });
+    });
+  });
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=[{wch:18},{wch:28},{wch:12},{wch:22},{wch:70},{wch:12},{wch:40}];
+  XLSX.utils.book_append_sheet(wb,ws,'Review');
+  XLSX.writeFile(wb,`review_${vname.replace(/\s/g,'_')}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  showToast('Review exported!');
+}
+
+/* ── UTILS ─────────────────────────────────────────────────────── */
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+/* ── FILE INPUTS ───────────────────────────────────────────────── */
+document.getElementById('copy-file').addEventListener('change', e => {
+  if(e.target.files[0]) readXLSX(e.target.files[0], (rows)=>processCopy(rows));
+  e.target.value='';
+});
+document.getElementById('attr-file').addEventListener('change', e => {
+  if(e.target.files[0]) readXLSX(e.target.files[0], (rows)=>processAttr(rows));
+  e.target.value='';
+});
+
+// Drag and drop for both zones
+['copy-drop','attr-drop'].forEach(id => {
+  const el=document.getElementById(id);
+  el.addEventListener('dragover',e=>{e.preventDefault();el.classList.add('drag-over');});
+  el.addEventListener('dragleave',()=>el.classList.remove('drag-over'));
+  el.addEventListener('drop',e=>{
+    e.preventDefault();el.classList.remove('drag-over');
+    const file=e.dataTransfer.files[0];
+    if(!file) return;
+    if(id==='copy-drop') readXLSX(file,(rows)=>processCopy(rows));
+    else readXLSX(file,(rows)=>processAttr(rows));
+  });
+});
+
+// Init
+setMode('admin');
+</script>
+</body>
+</html>
