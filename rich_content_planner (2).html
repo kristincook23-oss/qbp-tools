@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rich Content Weekly Planner</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #ffffff; --bg-secondary: #f5f5f3; --bg-tertiary: #efefec;
+  --text-primary: #1a1a18; --text-secondary: #6b6b67; --text-tertiary: #9f9f9a;
+  --border: rgba(0,0,0,0.12); --border-med: rgba(0,0,0,0.22);
+  --radius-md: 8px; --radius-lg: 12px;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'SF Mono','Fira Code',monospace;
+  --green-bg:#E1F5EE; --green-text:#085041; --green-border:#0F6E56;
+  --amber-bg:#FAEEDA; --amber-text:#633806; --amber-border:#BA7517;
+  --blue-bg:#E6F1FB;  --blue-text:#0C447C;  --blue-border:#185FA5;
+  --gray-bg:#F1EFE8;  --gray-text:#5F5E5A;  --gray-border:#888780;
+  --red-bg:#FCEBEB;   --red-text:#A32D2D;   --red-border:#E24B4A;
+  --purple-bg:#EEEDFE;--purple-text:#3C3489;--purple-border:#534AB7;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:#1e1e1c; --bg-secondary:#2a2a28; --bg-tertiary:#141412;
+    --text-primary:#f0f0ec; --text-secondary:#a0a09a; --text-tertiary:#6b6b67;
+    --border:rgba(255,255,255,0.1); --border-med:rgba(255,255,255,0.2);
+    --green-bg:#04342C; --green-text:#9FE1CB; --green-border:#1D9E75;
+    --amber-bg:#412402; --amber-text:#FAC775; --amber-border:#EF9F27;
+    --blue-bg:#042C53;  --blue-text:#B5D4F4;  --blue-border:#378ADD;
+    --gray-bg:#2C2C2A;  --gray-text:#B4B2A9;  --gray-border:#5F5E5A;
+    --red-bg:#501313;   --red-text:#F7C1C1;   --red-border:#E24B4A;
+    --purple-bg:#26215C;--purple-text:#CECBF6;--purple-border:#7F77DD;
+  }
+}
+body { font-family:var(--font); background:var(--bg-tertiary); color:var(--text-primary); min-height:100vh; line-height:1.5; }
+.page { max-width:980px; margin:0 auto; padding:2rem 1.5rem 4rem; }
+
+/* HEADER */
+.header { margin-bottom:1.5rem; display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+.header h1 { font-size:22px; font-weight:500; margin-bottom:3px; }
+.header p { font-size:14px; color:var(--text-secondary); }
+.header-btns { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start; }
+
+/* BUTTONS */
+.btn { background:var(--bg); border:0.5px solid var(--border-med); border-radius:var(--radius-md); padding:7px 13px; font-size:13px; font-family:var(--font); color:var(--text-primary); cursor:pointer; white-space:nowrap; transition:background 0.15s; display:inline-flex; align-items:center; gap:6px; }
+.btn:hover { background:var(--bg-secondary); }
+.btn:disabled { opacity:0.35; cursor:default; pointer-events:none; }
+.btn-primary { background:var(--text-primary); color:var(--bg); border-color:var(--text-primary); }
+.btn-primary:hover { opacity:0.82; background:var(--text-primary); }
+.btn-icon { padding:7px 10px; }
+
+/* DROP ZONE */
+.drop-zone { border:1.5px dashed var(--border-med); border-radius:var(--radius-lg); padding:3rem 2rem; text-align:center; cursor:pointer; background:var(--bg); transition:background 0.15s,border-color 0.15s; margin-bottom:2rem; }
+.drop-zone:hover,.drop-zone.drag-over { background:var(--bg-secondary); border-color:var(--blue-border); }
+.drop-icon { width:48px; height:48px; margin:0 auto 1rem; background:var(--bg-secondary); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:22px; color:var(--text-secondary); }
+.drop-zone h3 { font-size:16px; font-weight:500; margin-bottom:6px; }
+.drop-zone p { font-size:13px; color:var(--text-secondary); margin-bottom:4px; }
+.drop-zone small { font-size:12px; color:var(--text-tertiary); }
+
+/* STATS */
+.stats-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:1.5rem; }
+@media(max-width:700px){.stats-grid{grid-template-columns:repeat(3,1fr);}}
+.stat-card { background:var(--bg); border:0.5px solid var(--border); border-radius:var(--radius-md); padding:12px 14px; }
+.stat-card.stat-done { border-color:var(--green-border); }
+.stat-card.stat-done .stat-val { color:var(--green-text); }
+.stat-label { font-size:11px; color:var(--text-secondary); margin-bottom:3px; }
+.stat-val { font-size:22px; font-weight:500; }
+
+/* TABS */
+.tab-row { display:flex; gap:0; border-bottom:0.5px solid var(--border); margin-bottom:1rem; }
+.tab { padding:8px 16px; font-size:13px; cursor:pointer; color:var(--text-secondary); border-bottom:2px solid transparent; margin-bottom:-1px; transition:color 0.15s; white-space:nowrap; }
+.tab:hover { color:var(--text-primary); }
+.tab.active { color:var(--text-primary); font-weight:500; border-bottom-color:var(--text-primary); }
+.tab-badge { font-size:11px; background:var(--bg-secondary); border-radius:10px; padding:1px 6px; margin-left:4px; color:var(--text-tertiary); }
+.tab.active .tab-badge { background:var(--text-primary); color:var(--bg); }
+
+/* TOOLBAR */
+.toolbar { display:flex; align-items:center; gap:8px; margin-bottom:1rem; flex-wrap:wrap; background:var(--bg); border:0.5px solid var(--border); border-radius:var(--radius-lg); padding:10px 14px; }
+.toolbar label { font-size:12px; color:var(--text-secondary); white-space:nowrap; }
+.toolbar select,.toolbar input[type="text"] { background:var(--bg-secondary); border:0.5px solid var(--border-med); border-radius:var(--radius-md); padding:5px 9px; font-size:13px; font-family:var(--font); color:var(--text-primary); height:30px; outline:none; }
+.toolbar select:focus,.toolbar input[type="text"]:focus { border-color:var(--blue-border); }
+.toolbar input[type="text"] { width:175px; }
+.toolbar-sep { width:1px; height:20px; background:var(--border); flex-shrink:0; }
+.toolbar-right { margin-left:auto; display:flex; align-items:center; gap:10px; }
+.toggle-link { font-size:12px; color:var(--text-secondary); cursor:pointer; text-decoration:underline; text-underline-offset:2px; white-space:nowrap; }
+
+/* BRAND ALERT BANNER */
+.brand-alert { background:var(--purple-bg); border:0.5px solid var(--purple-border); border-radius:var(--radius-lg); padding:12px 16px; margin-bottom:1rem; display:flex; align-items:flex-start; gap:12px; }
+.brand-alert-icon { font-size:16px; flex-shrink:0; margin-top:1px; }
+.brand-alert-body { flex:1; }
+.brand-alert-title { font-size:13px; font-weight:500; color:var(--purple-text); margin-bottom:4px; }
+.brand-alert-list { font-size:13px; color:var(--purple-text); }
+.brand-pill { display:inline-flex; align-items:center; gap:6px; background:var(--purple-border); color:#fff; font-size:12px; font-weight:500; padding:3px 10px; border-radius:20px; margin:2px 4px 2px 0; cursor:pointer; }
+.brand-pill:hover { opacity:0.85; }
+
+/* CARDS */
+.group-header { font-size:13px; font-weight:500; color:var(--text-secondary); padding:6px 0; margin:1.25rem 0 8px; border-bottom:0.5px solid var(--border); display:flex; align-items:center; gap:8px; }
+.group-count { font-weight:400; color:var(--text-tertiary); }
+.item-card { background:var(--bg); border:0.5px solid var(--border); border-radius:var(--radius-lg); padding:14px 16px; margin-bottom:8px; display:flex; align-items:flex-start; gap:14px; }
+.item-card.p-high { border-left:3px solid var(--green-border); }
+.item-card.p-med  { border-left:3px solid var(--amber-border); }
+.item-card.p-low  { border-left:3px solid var(--gray-border); }
+.item-card.p-skip { border-left:3px solid var(--border); opacity:0.55; }
+.item-card.is-done { border-left:3px solid var(--green-border); background:var(--green-bg); }
+.item-card.is-new  { border-left:3px solid var(--blue-border); }
+
+.item-main { flex:1; min-width:0; }
+.item-top { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:5px; }
+.badge { display:inline-block; font-size:11px; font-weight:500; padding:2px 8px; border-radius:var(--radius-md); line-height:1.5; }
+.badge-brand  { background:var(--blue-bg);   color:var(--blue-text); }
+.badge-model  { background:var(--green-bg);  color:var(--green-text); }
+.badge-sku    { background:var(--amber-bg);  color:var(--amber-text); }
+.badge-skip   { background:var(--gray-bg);   color:var(--gray-text); }
+.badge-rank-a { background:var(--green-bg);  color:var(--green-text); }
+.badge-rank-b { background:var(--amber-bg);  color:var(--amber-text); }
+.badge-cat    { background:var(--bg-secondary); color:var(--text-secondary); }
+.badge-done   { background:var(--green-bg);  color:var(--green-text); }
+.badge-new    { background:var(--blue-bg);   color:var(--blue-text); }
+.badge-carry  { background:var(--gray-bg);   color:var(--gray-text); }
+
+.item-name { font-size:14px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:3px; }
+.item-meta { font-size:12px; color:var(--text-secondary); font-family:var(--font-mono); margin-bottom:8px; }
+.rec-box { background:var(--bg-secondary); border-radius:var(--radius-md); padding:9px 12px; margin-bottom:8px; }
+.rec-label { font-size:10px; font-weight:500; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-tertiary); margin-bottom:3px; }
+.rec-text { font-size:13px; line-height:1.5; }
+
+/* NOTES */
+.notes-area { margin-top:8px; }
+.notes-label { font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-tertiary); margin-bottom:4px; display:flex; align-items:center; gap:6px; }
+.notes-input { width:100%; background:var(--bg-secondary); border:0.5px solid var(--border-med); border-radius:var(--radius-md); padding:7px 10px; font-size:13px; font-family:var(--font); color:var(--text-primary); resize:vertical; min-height:56px; outline:none; line-height:1.5; }
+.notes-input:focus { border-color:var(--blue-border); }
+.notes-input::placeholder { color:var(--text-tertiary); }
+.assignee-row { display:flex; align-items:center; gap:8px; margin-top:6px; }
+.assignee-input { flex:1; background:var(--bg-secondary); border:0.5px solid var(--border-med); border-radius:var(--radius-md); padding:5px 10px; font-size:13px; font-family:var(--font); color:var(--text-primary); outline:none; height:30px; }
+.assignee-input:focus { border-color:var(--blue-border); }
+.assignee-input::placeholder { color:var(--text-tertiary); }
+
+.item-actions { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+.action-btn { font-size:12px; padding:5px 12px; border-radius:var(--radius-md); border:0.5px solid var(--border-med); background:var(--bg); color:var(--text-secondary); cursor:pointer; font-family:var(--font); transition:background 0.12s,color 0.12s,border-color 0.12s; }
+.action-btn:hover { background:var(--bg-secondary); color:var(--text-primary); }
+.done-btn:hover   { background:var(--green-bg)!important; color:var(--green-text)!important; border-color:var(--green-border)!important; }
+.undone-btn       { background:var(--green-bg); color:var(--green-text); border-color:var(--green-border); }
+.undone-btn:hover { background:var(--bg-secondary)!important; color:var(--text-secondary)!important; border-color:var(--border-med)!important; }
+.remove-btn:hover { background:var(--red-bg)!important; color:var(--red-text)!important; border-color:var(--red-border)!important; }
+
+.item-right { text-align:right; flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+.priority-pill { width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:500; }
+.pp-high { background:var(--green-bg); color:var(--green-text); }
+.pp-med  { background:var(--amber-bg); color:var(--amber-text); }
+.pp-low  { background:var(--gray-bg);  color:var(--gray-text); }
+.item-date { font-size:11px; color:var(--text-tertiary); text-align:right; }
+
+/* HISTORY TAB */
+.week-group { margin-bottom:2rem; }
+.week-title { font-size:15px; font-weight:500; margin-bottom:10px; padding-bottom:8px; border-bottom:0.5px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.week-meta { font-size:12px; color:var(--text-secondary); }
+.history-row { display:flex; align-items:center; gap:10px; padding:9px 12px; background:var(--bg); border:0.5px solid var(--border); border-radius:var(--radius-md); margin-bottom:6px; font-size:13px; }
+.history-row .h-sku { font-family:var(--font-mono); font-size:12px; color:var(--text-tertiary); min-width:80px; }
+.history-row .h-name { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.history-row .h-status { font-size:11px; font-weight:500; padding:2px 8px; border-radius:var(--radius-md); flex-shrink:0; }
+.hs-done    { background:var(--green-bg); color:var(--green-text); }
+.hs-pending { background:var(--amber-bg); color:var(--amber-text); }
+.hs-removed { background:var(--gray-bg);  color:var(--gray-text); }
+.history-row .h-note { font-size:12px; color:var(--text-secondary); flex:1; font-style:italic; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* SETTINGS PANEL */
+.settings-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:100; align-items:center; justify-content:center; }
+.settings-overlay.open { display:flex; }
+.settings-panel { background:var(--bg); border-radius:var(--radius-lg); width:min(680px,95vw); max-height:85vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.18); }
+.settings-header { padding:18px 20px 14px; border-bottom:0.5px solid var(--border); display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; background:var(--bg); z-index:1; }
+.settings-header h2 { font-size:16px; font-weight:500; }
+.settings-body { padding:20px; }
+.settings-section { margin-bottom:1.75rem; }
+.settings-section h3 { font-size:13px; font-weight:500; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:12px; }
+.settings-row { display:flex; align-items:flex-start; gap:12px; margin-bottom:10px; }
+.settings-row label { font-size:13px; color:var(--text-primary); flex:1; padding-top:2px; }
+.settings-row small { font-size:12px; color:var(--text-secondary); display:block; margin-top:2px; }
+.tag-list { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+.tag { display:inline-flex; align-items:center; gap:4px; background:var(--bg-secondary); border:0.5px solid var(--border-med); border-radius:20px; padding:3px 10px; font-size:12px; }
+.tag-remove { cursor:pointer; color:var(--text-tertiary); font-size:14px; line-height:1; }
+.tag-remove:hover { color:var(--red-text); }
+.tag-add-row { display:flex; gap:8px; }
+.tag-add-row input { flex:1; background:var(--bg-secondary); border:0.5px solid var(--border-med); border-radius:var(--radius-md); padding:5px 10px; font-size:13px; font-family:var(--font); color:var(--text-primary); outline:none; height:32px; }
+.tag-add-row input:focus { border-color:var(--blue-border); }
+.settings-footer { padding:14px 20px; border-top:0.5px solid var(--border); display:flex; justify-content:flex-end; gap:8px; position:sticky; bottom:0; background:var(--bg); }
+
+.empty-state { text-align:center; padding:3rem 1rem; color:var(--text-secondary); font-size:14px; }
+#file-input,#history-file-input { display:none; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <div>
+      <h1>Rich content weekly planner</h1>
+      <p>Upload your Product Content Report to generate this week's priority list</p>
+    </div>
+    <div class="header-btns">
+      <button class="btn" onclick="document.getElementById('file-input').click()">&#8679; Upload report</button>
+      <button class="btn" id="settings-btn" onclick="openSettings()">&#9881; Settings</button>
+      <button class="btn btn-primary" id="export-btn" onclick="exportXLSX()" disabled>&#8615; Export to Excel</button>
+      <input type="file" id="file-input" accept=".xlsx,.csv">
+      <input type="file" id="history-file-input" accept=".xlsx">
+    </div>
+  </div>
+
+  <div class="drop-zone" id="drop-zone">
+    <div class="drop-icon">&#8679;</div>
+    <h3>Drop your Product Content Report here</h3>
+    <p>Or click to browse for your .xlsx file</p>
+    <small>Filters applied on upload: Rank A/B &nbsp;&middot;&nbsp; Online 2026 &nbsp;&middot;&nbsp; Excludes configured proprietary brands</small>
+  </div>
+
+  <div id="results" style="display:none">
+    <div class="stats-grid" id="stats"></div>
+    <div id="brand-alerts"></div>
+
+    <div class="tab-row">
+      <div class="tab active" onclick="switchTab('plan',this)">This week <span class="tab-badge" id="tab-plan-count">0</span></div>
+      <div class="tab" onclick="switchTab('history',this)">History <span class="tab-badge" id="tab-history-count">0</span></div>
+    </div>
+
+    <div id="tab-plan">
+      <div class="toolbar">
+        <label>Type:</label>
+        <select id="type-filter" onchange="renderList()">
+          <option value="all">All types</option>
+          <option value="Brand story">Brand story</option>
+          <option value="Model content">Model content</option>
+          <option value="SKU content">SKU content</option>
+          <option value="Skip">Skip</option>
+        </select>
+        <label>Rank:</label>
+        <select id="rank-filter" onchange="renderList()">
+          <option value="all">A + B</option>
+          <option value="A">A only</option>
+          <option value="B">B only</option>
+        </select>
+        <div class="toolbar-sep"></div>
+        <label>Sort:</label>
+        <select id="sort-by" onchange="renderList()">
+          <option value="priority">Priority</option>
+          <option value="type">Content type</option>
+          <option value="date-desc">Date (newest)</option>
+          <option value="date-asc">Date (oldest)</option>
+          <option value="brand">Brand A–Z</option>
+          <option value="rank">Rank A→B</option>
+        </select>
+        <div class="toolbar-sep"></div>
+        <input type="text" id="search" placeholder="Search brand, model, category..." oninput="renderList()">
+        <div class="toolbar-right">
+          <span class="toggle-link" id="skip-toggle" onclick="toggleSkip()">Hide skips</span>
+          <span class="toggle-link" id="done-toggle" onclick="toggleDone()">Hide done</span>
+        </div>
+      </div>
+      <div id="list"></div>
+    </div>
+
+    <div id="tab-history" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap;">
+        <button class="btn" onclick="document.getElementById('history-file-input').click()">&#8679; Load previous export</button>
+        <span style="font-size:13px;color:var(--text-secondary)">Load a prior week's export to compare against this week's list</span>
+      </div>
+      <div id="history-content"><div class="empty-state">No history loaded yet. Export this week's plan and load it next week to track carry-over items.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS PANEL -->
+<div class="settings-overlay" id="settings-overlay" onclick="maybeCloseSettings(event)">
+  <div class="settings-panel">
+    <div class="settings-header">
+      <h2>Scoring settings</h2>
+      <button class="btn btn-icon" onclick="closeSettings()">&#10005;</button>
+    </div>
+    <div class="settings-body">
+
+      <div class="settings-section">
+        <h3>Excluded brands</h3>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">These brands are filtered out entirely on upload.</p>
+        <div class="tag-list" id="excl-brand-tags"></div>
+        <div class="tag-add-row">
+          <input type="text" id="excl-brand-input" placeholder="Add brand name..." onkeydown="if(event.key==='Enter')addTag('excl-brands','excl-brand-input')">
+          <button class="btn" onclick="addTag('excl-brands','excl-brand-input')">Add</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Skip categories</h3>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">Products in these categories are automatically skipped.</p>
+        <div class="tag-list" id="skip-cat-tags"></div>
+        <div class="tag-add-row">
+          <input type="text" id="skip-cat-input" placeholder="Add category..." onkeydown="if(event.key==='Enter')addTag('skip-cats','skip-cat-input')">
+          <button class="btn" onclick="addTag('skip-cats','skip-cat-input')">Add</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Skip keywords</h3>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">Products whose short description contains these words are skipped.</p>
+        <div class="tag-list" id="skip-kw-tags"></div>
+        <div class="tag-add-row">
+          <input type="text" id="skip-kw-input" placeholder="Add keyword..." onkeydown="if(event.key==='Enter')addTag('skip-kws','skip-kw-input')">
+          <button class="btn" onclick="addTag('skip-kws','skip-kw-input')">Add</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Brand story categories</h3>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">Products in these categories are recommended for brand story content.</p>
+        <div class="tag-list" id="brand-cat-tags"></div>
+        <div class="tag-add-row">
+          <input type="text" id="brand-cat-input" placeholder="Add category..." onkeydown="if(event.key==='Enter')addTag('brand-cats','brand-cat-input')">
+          <button class="btn" onclick="addTag('brand-cats','brand-cat-input')">Add</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Model content categories</h3>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">Products in these categories are recommended for model-level content.</p>
+        <div class="tag-list" id="model-cat-tags"></div>
+        <div class="tag-add-row">
+          <input type="text" id="model-cat-input" placeholder="Add category..." onkeydown="if(event.key==='Enter')addTag('model-cats','model-cat-input')">
+          <button class="btn" onclick="addTag('model-cats','model-cat-input')">Add</button>
+        </div>
+      </div>
+
+    </div>
+    <div class="settings-footer">
+      <button class="btn" onclick="resetSettings()">Reset to defaults</button>
+      <button class="btn btn-primary" onclick="saveAndClose()">Save &amp; re-score</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── DEFAULT SETTINGS ─────────────────────────────────────────── */
+const DEFAULTS = {
+  'excl-brands': ['salsa','surly','teravail','45nrth'],
+  'skip-cats':   ['degreaser','lube','chain lube','sealant','cleaners','tapes & plugs','grease','cables & housing','bolts','nuts','fasteners','bearings','spokes','nipples','tubes','patches','patch kit','water bottle','bottle cage','cable','housing'],
+  'skip-kws':    ['adapter','shim','bolt','nut','screw','washer','plug','cap','spacer','spoke','nipple','patch','tube','sealant','grease','cleaner','degreaser'],
+  'brand-cats':  ['helmets','gloves','shorts','pants','jerseys','jackets','bibs','base layers','shoes','flat pedal shoes','mountain biking shoes','road shoes','tights','socks','vests','apparel'],
+  'model-cats':  ['tires','saddles','dropper seatpost','suspension fork','rear shocks','crankset','wheelset','handlebars','stems','pedals','brakes','disc brake & lever','front wheel','rear wheel','cw rims','handlebar bag','top tube/ stem bag','headlight & taillight set','taillight','headlight','lights']
+};
+
+function loadSettings() {
+  const s = {};
+  Object.keys(DEFAULTS).forEach(k => {
+    try { s[k] = JSON.parse(localStorage.getItem('rcp_'+k)) || [...DEFAULTS[k]]; }
+    catch(e) { s[k] = [...DEFAULTS[k]]; }
+  });
+  return s;
+}
+function saveSettings(s) {
+  Object.keys(s).forEach(k => localStorage.setItem('rcp_'+k, JSON.stringify(s[k])));
+}
+
+let settings = loadSettings();
+
+/* ── STATE ────────────────────────────────────────────────────── */
+let allItems   = [];
+let showSkips  = true;
+let showDone   = true;
+let historyWeeks = [];
+let rawRows    = [];
+
+/* ── SCORING ──────────────────────────────────────────────────── */
+function scoreItem(r) {
+  const brand = (r['Brand']||'').toString().trim();
+  const cat   = (r['Category']||'').toString().toLowerCase().trim();
+  const model = (r['Model Description']||'').toString().trim();
+  const desc  = (r['Short Description']||'').toString().toLowerCase();
+  const rank  = (r['Rank']||'').toString().trim().toUpperCase();
+  const addtl = parseInt(r['# of addtl content'])||0;
+
+  if (settings['skip-cats'].some(c=>cat.includes(c)) || settings['skip-kws'].some(k=>desc.includes(k)))
+    return {type:'Skip',reason:'Small part / commodity item — not strategic for rich content',priority:0};
+  if (addtl>0)
+    return {type:'Skip',reason:`Already has ${addtl} rich content block(s) — review before adding more`,priority:0};
+
+  const isBrand = settings['brand-cats'].some(c=>cat.includes(c));
+  const isModel = settings['model-cats'].some(c=>cat.includes(c));
+  const isTech  = ['dropper','fork','shock','crankset','wheelset','sensor','computer','light','gps','radar','power meter'].some(k=>desc.includes(k));
+
+  if (isBrand&&rank==='A') return {type:'Brand story',reason:`${brand} brand story block — one content piece applies across all ${cat} SKUs from this brand. Rank A placement makes this high ROI.`,priority:3};
+  if (isBrand)             return {type:'Brand story',reason:`${brand} brand story block — origin story and design philosophy content elevates the entire ${cat} line.`,priority:2};
+  if ((isModel||isTech)&&rank==='A') return {type:'Model content',reason:`Model-level feature callouts for ${model} — flows to all colorways and sizes. Rank A makes this a priority this week.`,priority:3};
+  if (isModel||isTech)     return {type:'Model content',reason:`Model-level content for ${model} — feature callouts and spec story that apply across all SKUs in this model.`,priority:2};
+  if (rank==='A')          return {type:'Model content',reason:`Rank A product — strong candidate for model-level content to differentiate on shelf and support purchase confidence.`,priority:2};
+  return {type:'Skip',reason:'No clear rich content angle at this time — revisit if product gains traction',priority:0};
+}
+
+/* ── PROCESS UPLOADED REPORT ─────────────────────────────────── */
+function processRows(rows) {
+  rawRows = rows;
+  const prevSkus = {};
+  allItems.forEach(i => { prevSkus[i.sku] = {notes:i.notes||'',assignee:i.assignee||'',status:i.status}; });
+
+  allItems = rows.filter(r=>{
+    const rank = (r['Rank']||'').toString().trim().toUpperCase();
+    if (!['A','B'].includes(rank)) return false;
+    if ((r['Online?']||'').toString().trim().toUpperCase()!=='YES') return false;
+    if (settings['excl-brands'].includes((r['Brand']||'').toString().trim().toLowerCase())) return false;
+    const d = new Date(r['Online From:']);
+    return !isNaN(d) && d.getFullYear()===2026;
+  }).map(r=>{
+    const rec = scoreItem(r);
+    const d   = new Date(r['Online From:']);
+    const sku = r['Material ID']||'';
+    const prev = prevSkus[sku]||{};
+    return {
+      sku, name:r['Short Description']||'', brand:r['Brand']||'',
+      model:r['Model Description']||'', category:r['Category']||'',
+      rank:(r['Rank']||'').toString().trim().toUpperCase(),
+      date:d, dateStr:isNaN(d)?'':`${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`,
+      status: prev.status||'pending',
+      notes:  prev.notes||'',
+      assignee: prev.assignee||'',
+      isNew: !prev.status,
+      ...rec
+    };
+  });
+
+  document.getElementById('drop-zone').style.display='none';
+  document.getElementById('results').style.display='block';
+  document.getElementById('export-btn').disabled=false;
+  renderStats();
+  renderBrandAlerts();
+  renderList();
+  updateTabCounts();
+}
+
+/* ── STATS ────────────────────────────────────────────────────── */
+function renderStats() {
+  const vis = allItems.filter(i=>i.status!=='removed');
+  const act = vis.filter(i=>i.type!=='Skip');
+  document.getElementById('stats').innerHTML=`
+    <div class="stat-card"><div class="stat-label">Total candidates</div><div class="stat-val">${vis.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Brand story</div><div class="stat-val">${act.filter(i=>i.type==='Brand story').length}</div></div>
+    <div class="stat-card"><div class="stat-label">Model content</div><div class="stat-val">${act.filter(i=>i.type==='Model content').length}</div></div>
+    <div class="stat-card"><div class="stat-label">SKU content</div><div class="stat-val">${act.filter(i=>i.type==='SKU content').length}</div></div>
+    <div class="stat-card"><div class="stat-label">New this week</div><div class="stat-val">${vis.filter(i=>i.isNew&&i.type!=='Skip').length}</div></div>
+    <div class="stat-card stat-done"><div class="stat-label">Marked done</div><div class="stat-val">${vis.filter(i=>i.status==='done').length}</div></div>
+  `;
+}
+
+/* ── BRAND ALERTS ─────────────────────────────────────────────── */
+function renderBrandAlerts() {
+  const actionable = allItems.filter(i=>i.status!=='removed'&&i.type!=='Skip');
+  const brandMap = {};
+  actionable.forEach(i=>{ if(!brandMap[i.brand]) brandMap[i.brand]=0; brandMap[i.brand]++; });
+  const multi = Object.entries(brandMap).filter(([b,n])=>n>=3).sort((a,b)=>b[1]-a[1]);
+
+  if (!multi.length) { document.getElementById('brand-alerts').innerHTML=''; return; }
+
+  const pills = multi.map(([b,n])=>`<span class="brand-pill" onclick="filterBrand('${b}')">${b} <strong>${n} SKUs</strong></span>`).join('');
+  document.getElementById('brand-alerts').innerHTML=`
+    <div class="brand-alert">
+      <div class="brand-alert-icon">&#9889;</div>
+      <div class="brand-alert-body">
+        <div class="brand-alert-title">Brand grouping opportunity</div>
+        <div class="brand-alert-list">These brands have 3+ actionable SKUs — consider a single brand story block that covers all of them at once: ${pills}</div>
+      </div>
+    </div>`;
+}
+
+function filterBrand(brand) {
+  document.getElementById('search').value = brand;
+  renderList();
+}
+
+/* ── TABS ─────────────────────────────────────────────────────── */
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-plan').style.display    = name==='plan'    ? 'block' : 'none';
+  document.getElementById('tab-history').style.display = name==='history' ? 'block' : 'none';
+  if (name==='history') renderHistory();
+}
+
+function updateTabCounts() {
+  const act = allItems.filter(i=>i.status!=='removed'&&i.type!=='Skip').length;
+  document.getElementById('tab-plan-count').textContent = act;
+  document.getElementById('tab-history-count').textContent = historyWeeks.length;
+}
+
+/* ── LIST RENDERING ───────────────────────────────────────────── */
+function getSorted(items) {
+  const by = document.getElementById('sort-by').value;
+  const TO = {'Brand story':0,'Model content':1,'SKU content':2,'Skip':3};
+  return [...items].sort((a,b)=>{
+    if(by==='priority')  return b.priority!==a.priority?b.priority-a.priority:b.date-a.date;
+    if(by==='type')      return TO[a.type]!==TO[b.type]?TO[a.type]-TO[b.type]:b.priority-a.priority;
+    if(by==='date-desc') return b.date-a.date;
+    if(by==='date-asc')  return a.date-b.date;
+    if(by==='brand')     return a.brand.localeCompare(b.brand);
+    if(by==='rank')      return a.rank.localeCompare(b.rank)||b.priority-a.priority;
+    return 0;
+  });
+}
+
+function toggleSkip() { showSkips=!showSkips; document.getElementById('skip-toggle').textContent=showSkips?'Hide skips':'Show skips'; renderList(); }
+function toggleDone()  { showDone=!showDone;   document.getElementById('done-toggle').textContent=showDone?'Hide done':'Show done';   renderList(); }
+
+function markDone(sku)   { const i=allItems.find(x=>x.sku===sku); if(i){i.status=i.status==='done'?'pending':'done'; renderStats();renderList();} }
+function removeItem(sku) { const i=allItems.find(x=>x.sku===sku); if(i){i.status='removed'; renderStats();renderList();renderBrandAlerts();updateTabCounts();} }
+
+function updateNote(sku, val)     { const i=allItems.find(x=>x.sku===sku); if(i) i.notes=val; }
+function updateAssignee(sku, val) { const i=allItems.find(x=>x.sku===sku); if(i) i.assignee=val; }
+
+function renderList() {
+  const typeF  = document.getElementById('type-filter').value;
+  const rankF  = document.getElementById('rank-filter').value;
+  const search = document.getElementById('search').value.toLowerCase();
+  const by     = document.getElementById('sort-by').value;
+
+  let items = allItems.filter(i=>{
+    if(i.status==='removed') return false;
+    if(!showSkips && i.type==='Skip') return false;
+    if(!showDone  && i.status==='done') return false;
+    if(typeF!=='all' && i.type!==typeF) return false;
+    if(rankF!=='all' && i.rank!==rankF) return false;
+    if(search && !`${i.brand} ${i.model} ${i.category} ${i.name}`.toLowerCase().includes(search)) return false;
+    return true;
+  });
+  items = getSorted(items);
+
+  if(!items.length){ document.getElementById('list').innerHTML='<div class="empty-state">No items match your filters.</div>'; return; }
+
+  const useGroups = by==='priority'||by==='type';
+  let html='';
+  if(useGroups){
+    const TO=['Brand story','Model content','SKU content','Skip'];
+    const groups={};
+    items.forEach(i=>{if(!groups[i.type])groups[i.type]=[];groups[i.type].push(i);});
+    TO.forEach(type=>{ if(!groups[type]) return; html+=`<div class="group-header">${type} <span class="group-count">(${groups[type].length})</span></div>`; groups[type].forEach(i=>{html+=cardHTML(i);}); });
+  } else {
+    items.forEach(i=>{html+=cardHTML(i);});
+  }
+  document.getElementById('list').innerHTML=html;
+}
+
+function cardHTML(i) {
+  const isDone = i.status==='done';
+  const pCls   = isDone?'is-done':i.isNew&&i.type!=='Skip'?'is-new':i.priority===3?'p-high':i.priority===2?'p-med':i.priority===1?'p-low':'p-skip';
+  const ppCls  = i.priority===3?'pp-high':i.priority===2?'pp-med':'pp-low';
+  const prLabel= i.priority===3?'P1':i.priority===2?'P2':'P3';
+  const tBadge = {'Brand story':'<span class="badge badge-brand">Brand story</span>','Model content':'<span class="badge badge-model">Model content</span>','SKU content':'<span class="badge badge-sku">SKU content</span>','Skip':'<span class="badge badge-skip">Skip</span>'}[i.type]||'';
+  const rBadge = i.rank==='A'?'<span class="badge badge-rank-a">Rank A</span>':'<span class="badge badge-rank-b">Rank B</span>';
+  const newBadge = i.isNew&&i.type!=='Skip'?'<span class="badge badge-new">New</span>':'';
+  const doneBadge= isDone?'<span class="badge badge-done">&#10003; Complete</span>':'';
+  const doneBtn  = isDone?`<button class="action-btn undone-btn" onclick="markDone('${i.sku}')">&#10003; Done</button>`:`<button class="action-btn done-btn" onclick="markDone('${i.sku}')">Mark done</button>`;
+  const safeNotes = (i.notes||'').replace(/"/g,'&quot;');
+  const safeAssignee = (i.assignee||'').replace(/"/g,'&quot;');
+
+  return `
+  <div class="item-card ${pCls}">
+    <div class="item-main">
+      <div class="item-top">${rBadge}${tBadge}<span class="badge badge-cat">${i.category}</span>${newBadge}${doneBadge}</div>
+      <div class="item-name">${i.brand} &mdash; ${i.model||i.name}</div>
+      <div class="item-meta">${i.sku} &nbsp;&middot;&nbsp; ${i.name}</div>
+      <div class="rec-box"><div class="rec-label">Recommendation</div><div class="rec-text">${i.reason}</div></div>
+      <div class="notes-area">
+        <div class="notes-label">Notes &amp; details</div>
+        <textarea class="notes-input" placeholder="Add content notes, ideas, or context for this item..." oninput="updateNote('${i.sku}',this.value)">${safeNotes}</textarea>
+        <div class="assignee-row">
+          <span style="font-size:12px;color:var(--text-tertiary);white-space:nowrap">Assign to:</span>
+          <input type="text" class="assignee-input" placeholder="Team member name..." value="${safeAssignee}" oninput="updateAssignee('${i.sku}',this.value)">
+        </div>
+      </div>
+      <div class="item-actions">${doneBtn}<button class="action-btn remove-btn" onclick="removeItem('${i.sku}')">Remove</button></div>
+    </div>
+    <div class="item-right">
+      ${i.priority>0?`<div class="priority-pill ${ppCls}">${prLabel}</div>`:''}
+      <div class="item-date">Online<br>${i.dateStr}</div>
+    </div>
+  </div>`;
+}
+
+/* ── HISTORY ──────────────────────────────────────────────────── */
+function renderHistory() {
+  if(!historyWeeks.length){
+    document.getElementById('history-content').innerHTML='<div class="empty-state">No history loaded yet. Export this week\'s plan and load it next week to track carry-over items.</div>';
+    return;
+  }
+  let html='';
+  historyWeeks.forEach(week=>{
+    const total = week.rows.length;
+    const done  = week.rows.filter(r=>r['Status']==='Done').length;
+    html+=`<div class="week-group">
+      <div class="week-title"><span>${week.label}</span><span class="week-meta">${done}/${total} completed</span></div>`;
+    week.rows.forEach(r=>{
+      const st  = r['Status']||'Pending';
+      const cls = st==='Done'?'hs-done':st==='Removed'?'hs-removed':'hs-pending';
+      const note= r['Notes']||'';
+      const who = r['Assignee']?`<span style="font-size:11px;background:var(--blue-bg);color:var(--blue-text);padding:1px 7px;border-radius:10px">${r['Assignee']}</span>`:'';
+      html+=`<div class="history-row">
+        <span class="h-sku">${r['SKU']||''}</span>
+        <span class="h-name">${r['Brand']||''} — ${r['Model']||r['Product Name']||''}</span>
+        ${who}
+        ${note?`<span class="h-note">"${note}"</span>`:''}
+        <span class="h-status ${cls}">${st}</span>
+      </div>`;
+    });
+    html+='</div>';
+  });
+
+  // carry-over: items in history that are still pending and appear in this week's list
+  const histSkus = new Set(historyWeeks.flatMap(w=>w.rows.filter(r=>r['Status']!=='Done'&&r['Status']!=='Removed').map(r=>r['SKU'])));
+  const carryOver = allItems.filter(i=>histSkus.has(i.sku)&&i.type!=='Skip');
+  if(carryOver.length){
+    html+=`<div class="group-header" style="margin-top:2rem">Carry-over from previous weeks <span class="group-count">(${carryOver.length})</span></div>`;
+    carryOver.forEach(i=>{
+      html+=`<div class="history-row">
+        <span class="h-sku">${i.sku}</span>
+        <span class="h-name">${i.brand} — ${i.model||i.name}</span>
+        <span class="badge badge-carry">Carry-over</span>
+        <span class="h-status hs-pending">Pending</span>
+      </div>`;
+    });
+  }
+
+  document.getElementById('history-content').innerHTML=html||'<div class="empty-state">No data to show.</div>';
+}
+
+document.getElementById('history-file-input').addEventListener('change', e=>{
+  if(!e.target.files[0]) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const wb   = XLSX.read(ev.target.result,{type:'binary'});
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws,{raw:false});
+    const label= e.target.files[0].name.replace('.xlsx','').replace(/_/g,' ');
+    historyWeeks.unshift({label, rows});
+    updateTabCounts();
+    renderHistory();
+  };
+  reader.readAsBinaryString(e.target.files[0]);
+  e.target.value='';
+});
+
+/* ── EXPORT ───────────────────────────────────────────────────── */
+function exportXLSX() {
+  const today = new Date();
+  const tag   = `${today.getMonth()+1}-${today.getDate()}-${today.getFullYear()}`;
+
+  const mainRows = allItems.filter(i=>i.status!=='removed').map(i=>({
+    'SKU':i.sku,'Product Name':i.name,'Brand':i.brand,'Model':i.model,
+    'Category':i.category,'Rank':i.rank,'Online Date':i.dateStr,
+    'Content Type':i.type,'Priority':i.priority===3?'P1':i.priority===2?'P2':i.priority===1?'P3':'—',
+    'Recommendation':i.reason,'Notes':i.notes||'','Assignee':i.assignee||'',
+    'Status':i.status==='done'?'Done':'Pending','New This Week':i.isNew?'Yes':''
+  }));
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(mainRows);
+  ws['!cols']=[{wch:12},{wch:44},{wch:20},{wch:30},{wch:22},{wch:6},{wch:12},{wch:16},{wch:9},{wch:60},{wch:30},{wch:16},{wch:10},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,ws,'Rich Content Plan');
+
+  const vis = allItems.filter(i=>i.status!=='removed');
+  const summary=[
+    ['Rich Content Weekly Summary',''],
+    ['Generated',`${today.getMonth()+1}/${today.getDate()}/${today.getFullYear()}`],
+    ['',''],
+    ['Content Type','Count'],
+    ['Brand story',  vis.filter(i=>i.type==='Brand story').length],
+    ['Model content',vis.filter(i=>i.type==='Model content').length],
+    ['SKU content',  vis.filter(i=>i.type==='SKU content').length],
+    ['Skip',         vis.filter(i=>i.type==='Skip').length],
+    ['',''],
+    ['Status','Count'],
+    ['Done',    vis.filter(i=>i.status==='done').length],
+    ['Pending', vis.filter(i=>i.status==='pending'&&i.type!=='Skip').length],
+    ['',''],
+    ['New this week', vis.filter(i=>i.isNew&&i.type!=='Skip').length],
+  ];
+  const ws2=XLSX.utils.aoa_to_sheet(summary);
+  ws2['!cols']=[{wch:22},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Summary');
+
+  XLSX.writeFile(wb,`Rich_Content_Plan_${tag}.xlsx`);
+}
+
+/* ── SETTINGS UI ──────────────────────────────────────────────── */
+function openSettings() {
+  settings = loadSettings();
+  renderAllTags();
+  document.getElementById('settings-overlay').classList.add('open');
+}
+function closeSettings() { document.getElementById('settings-overlay').classList.remove('open'); }
+function maybeCloseSettings(e) { if(e.target===document.getElementById('settings-overlay')) closeSettings(); }
+
+function saveAndClose() {
+  settings = collectSettings();
+  saveSettings(settings);
+  closeSettings();
+  if(rawRows.length) processRows(rawRows);
+}
+function resetSettings() {
+  Object.keys(DEFAULTS).forEach(k=>{ settings[k]=[...DEFAULTS[k]]; });
+  renderAllTags();
+}
+
+function collectSettings() {
+  const s={};
+  [['excl-brands','excl-brand-tags'],['skip-cats','skip-cat-tags'],['skip-kws','skip-kw-tags'],['brand-cats','brand-cat-tags'],['model-cats','model-cat-tags']].forEach(([key,elId])=>{
+    s[key]=[...document.getElementById(elId).querySelectorAll('.tag')].map(t=>t.dataset.val);
+  });
+  return s;
+}
+
+function renderAllTags() {
+  [['excl-brands','excl-brand-tags'],['skip-cats','skip-cat-tags'],['skip-kws','skip-kw-tags'],['brand-cats','brand-cat-tags'],['model-cats','model-cat-tags']].forEach(([key,elId])=>{
+    renderTags(key, elId);
+  });
+}
+
+function renderTags(key, elId) {
+  const el = document.getElementById(elId);
+  el.innerHTML = settings[key].map(v=>`<span class="tag" data-val="${v}">${v}<span class="tag-remove" onclick="removeTag('${key}','${elId}','${v}')">&#215;</span></span>`).join('');
+}
+
+function removeTag(key, elId, val) {
+  settings[key]=settings[key].filter(v=>v!==val);
+  renderTags(key, elId);
+}
+
+function addTag(key, inputId) {
+  const input = document.getElementById(inputId);
+  const val = input.value.trim().toLowerCase();
+  if(!val) return;
+  if(!settings[key].includes(val)) {
+    settings[key].push(val);
+    const elId = inputId.replace('-input','-tags');
+    renderTags(key, elId);
+  }
+  input.value='';
+}
+
+/* ── FILE HANDLING ────────────────────────────────────────────── */
+document.getElementById('file-input').addEventListener('change', e=>{
+  if(e.target.files[0]) readFile(e.target.files[0]);
+  e.target.value='';
+});
+const dz=document.getElementById('drop-zone');
+dz.addEventListener('click',()=>document.getElementById('file-input').click());
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over');if(e.dataTransfer.files[0])readFile(e.dataTransfer.files[0]);});
+
+function readFile(file) {
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    processRows(XLSX.utils.sheet_to_json(ws,{raw:false}));
+  };
+  reader.readAsBinaryString(file);
+}
+</script>
+</body>
+</html>
