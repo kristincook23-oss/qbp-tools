@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vendor Copy Audit Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --paper: #f5f2ec;
+    --paper-warm: #ede9df;
+    --rule: #c8bfa8;
+    --rule-light: #e0d9cc;
+    --accent: #b84c1e;
+    --accent-muted: #e8d5cc;
+    --approve-bg: #d6edda;
+    --approve-border: #4a9458;
+    --reject-bg: #fde8e8;
+    --reject-border: #c0392b;
+    --pending-bg: #fef9ee;
+    --model-stripe: #ede9df;
+    --sku-stripe: #f9f7f3;
+    --font-body: 'Libre Baskerville', Georgia, serif;
+    --font-mono: 'DM Mono', 'Courier New', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+
+  /* ─── HEADER ─── */
+  header {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 3px solid var(--accent);
+  }
+  header h1 {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  header .subtitle {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: #888;
+    letter-spacing: 0.08em;
+  }
+  .header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .btn {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 7px 14px;
+    border: 1px solid currentColor;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: transparent;
+  }
+  .btn-ghost { color: #aaa; border-color: #444; }
+  .btn-ghost:hover { color: var(--paper); border-color: var(--paper); }
+  .btn-accent { color: var(--accent); border-color: var(--accent); }
+  .btn-accent:hover { background: var(--accent); color: white; }
+  .btn-primary { background: var(--accent); color: white; border-color: var(--accent); }
+  .btn-primary:hover { background: #9a3e18; }
+
+  /* ─── INTAKE SCREEN ─── */
+  #intake {
+    max-width: 720px;
+    margin: 80px auto;
+    padding: 0 24px;
+  }
+  .intake-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+  #intake h2 {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 8px;
+  }
+  #intake p {
+    color: #555;
+    font-size: 15px;
+    line-height: 1.7;
+    margin-bottom: 28px;
+  }
+  .col-legend {
+    background: var(--paper-warm);
+    border: 1px solid var(--rule);
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.9;
+    color: #555;
+  }
+  .col-legend strong { color: var(--ink); }
+  textarea#rawInput {
+    width: 100%;
+    height: 260px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 16px;
+    border: 2px solid var(--rule);
+    background: white;
+    color: var(--ink);
+    resize: vertical;
+    outline: none;
+    line-height: 1.6;
+  }
+  textarea#rawInput:focus { border-color: var(--accent); }
+  textarea#rawInput::placeholder { color: #aaa; }
+  .intake-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 14px;
+  }
+  .error-msg {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent);
+    display: none;
+  }
+
+  /* ─── AUDIT VIEW ─── */
+  #auditView { display: none; padding: 0; }
+
+  .audit-toolbar {
+    background: var(--paper-warm);
+    border-bottom: 1px solid var(--rule);
+    padding: 10px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    flex-wrap: wrap;
+  }
+  .stat-chip {
+    padding: 4px 10px;
+    border: 1px solid var(--rule);
+    background: white;
+    color: #555;
+  }
+  .stat-chip span { color: var(--ink); font-weight: 500; }
+  .toolbar-right { margin-left: auto; display: flex; gap: 8px; }
+
+  /* ─── PRODUCT CARD ─── */
+  .products-container {
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .product-card {
+    border: 1px solid var(--rule);
+    background: white;
+    overflow: hidden;
+  }
+
+  .product-header {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 16px 24px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .product-header-left {}
+  .product-number {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 4px;
+  }
+  .product-title {
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+  .product-meta {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: #aaa;
+    margin-top: 4px;
+  }
+  .product-meta span { color: #ddd; }
+
+  /* ─── ROWS ─── */
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    padding: 10px 24px 4px;
+    border-top: 1px solid var(--rule-light);
+    background: var(--model-stripe);
+  }
+  .section-label.sku-label {
+    color: #6a5c3a;
+    background: var(--sku-stripe);
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 160px 1fr 220px 100px;
+    border-bottom: 1px solid var(--rule-light);
+    min-height: 44px;
+  }
+  .field-row:last-child { border-bottom: none; }
+
+  .field-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: #888;
+    padding: 12px 16px 12px 24px;
+    display: flex;
+    align-items: flex-start;
+    padding-top: 13px;
+    border-right: 1px solid var(--rule-light);
+    background: var(--paper);
+  }
+
+  .field-content {
+    padding: 10px 14px;
+    border-right: 1px solid var(--rule-light);
+    display: flex;
+    align-items: flex-start;
+  }
+
+  .field-editable {
+    width: 100%;
+    font-family: var(--font-body);
+    font-size: 14px;
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    line-height: 1.6;
+    min-height: 24px;
+    padding: 2px 4px;
+    border-radius: 2px;
+    transition: background 0.15s;
+  }
+  .field-editable:focus {
+    background: #fefef0;
+    outline: 1px solid #c8a832;
+  }
+  .field-editable.bullet-field {
+    font-size: 13px;
+    white-space: pre-wrap;
+  }
+
+  .field-comment {
+    padding: 10px 12px;
+    border-right: 1px solid var(--rule-light);
+  }
+  .field-comment textarea {
+    width: 100%;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: #555;
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    line-height: 1.5;
+    min-height: 24px;
+    padding: 2px 4px;
+    border-radius: 2px;
+    transition: background 0.15s;
+  }
+  .field-comment textarea:focus { background: #fff9e8; }
+  .field-comment textarea::placeholder { color: #ccc; font-style: italic; }
+
+  .field-status {
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ─── APPROVAL CHECKBOXES ─── */
+  .approval-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    align-items: center;
+    width: 100%;
+  }
+  .approval-btn {
+    width: 100%;
+    padding: 5px 8px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    border: 1px solid var(--rule);
+    background: white;
+    cursor: pointer;
+    transition: all 0.12s;
+    text-align: center;
+    color: #999;
+  }
+  .approval-btn:hover { border-color: #aaa; color: #555; }
+  .approval-btn.active-approve {
+    background: var(--approve-bg);
+    border-color: var(--approve-border);
+    color: var(--approve-border);
+    font-weight: 500;
+  }
+  .approval-btn.active-reject {
+    background: var(--reject-bg);
+    border-color: var(--reject-border);
+    color: var(--reject-border);
+    font-weight: 500;
+  }
+
+  /* ─── PRODUCT-LEVEL APPROVAL BANNER ─── */
+  .approval-banner {
+    border-top: 1px solid var(--rule-light);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--paper-warm);
+    gap: 16px;
+  }
+  .approval-banner-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #888;
+  }
+  .approval-options {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .approve-product-btn, .reject-product-btn {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    padding: 8px 18px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: white;
+  }
+  .approve-product-btn {
+    border-color: var(--approve-border);
+    color: var(--approve-border);
+  }
+  .approve-product-btn:hover, .approve-product-btn.active {
+    background: var(--approve-bg);
+  }
+  .approve-product-btn.active { font-weight: 700; }
+  .reject-product-btn {
+    border-color: var(--reject-border);
+    color: var(--reject-border);
+  }
+  .reject-product-btn:hover, .reject-product-btn.active {
+    background: var(--reject-bg);
+  }
+  .reject-product-btn.active { font-weight: 700; }
+
+  .overall-comment {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 8px 12px;
+    border: 1px solid var(--rule);
+    background: white;
+    outline: none;
+    color: var(--ink);
+    max-width: 400px;
+  }
+  .overall-comment:focus { border-color: var(--accent); }
+  .overall-comment::placeholder { color: #ccc; font-style: italic; }
+
+  /* ─── EXPORT ─── */
+  #exportModal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  #exportModal.open { display: flex; }
+  .modal-box {
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    padding: 32px;
+    max-width: 480px;
+    width: 90%;
+  }
+  .modal-box h3 {
+    font-size: 18px;
+    margin-bottom: 8px;
+  }
+  .modal-box p {
+    font-size: 14px;
+    color: #555;
+    line-height: 1.7;
+    margin-bottom: 20px;
+  }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* ─── DROP ZONE ─── */
+  .drop-zone {
+    border: 2px dashed var(--rule);
+    background: white;
+    padding: 28px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: #fdf8f5;
+  }
+  .drop-zone.drag-over { background: var(--accent-muted); }
+  .drop-zone input[type=file] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+  .drop-icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+    line-height: 1;
+  }
+  .drop-label {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: #888;
+    letter-spacing: 0.08em;
+  }
+  .drop-label strong { color: var(--ink); }
+  .drop-label .formats {
+    display: block;
+    font-size: 10px;
+    color: #aaa;
+    margin-top: 4px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .drop-success {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--approve-border);
+    margin-top: 6px;
+    display: none;
+  }
+  .intake-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .intake-divider hr { flex: 1; border: none; border-top: 1px solid var(--rule-light); }
+  .intake-divider span {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #aaa;
+  }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 768px) {
+    .field-row {
+      grid-template-columns: 120px 1fr;
+      grid-template-rows: auto auto;
+    }
+    .field-comment { grid-column: 2; border-top: 1px solid var(--rule-light); }
+    .field-status { grid-column: 1 / -1; justify-content: flex-start; padding-left: 24px; }
+    .products-container { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── INTAKE SCREEN ─── -->
+<div id="intake">
+  <div class="intake-eyebrow">QBP Content Ops</div>
+  <h2>Vendor Copy Audit</h2>
+  <p>Paste an Enterworks flat export below. Each row should be tab-separated with the 10-column format. The tool will reformat it into a PDP-style audit view vendors can read, annotate, and approve.</p>
+
+  <div class="col-legend">
+    <strong>Expected columns (tab-separated, header row optional):</strong><br>
+    Col 1: SKU &nbsp;·&nbsp; Col 2: Name &nbsp;·&nbsp; Col 3: Brand &nbsp;·&nbsp; Col 4: Taxonomy Node &nbsp;·&nbsp; Col 5: Model Code<br>
+    Col 6: Model Description &nbsp;·&nbsp; Col 7: Model Bullet Text (tilde~delimited) &nbsp;·&nbsp; Col 8: Model Bullet Order<br>
+    Col 9: SKU Bullet Text (tilde~delimited) &nbsp;·&nbsp; Col 10: SKU Bullet Order
+  </div>
+
+  <div class="drop-zone" id="dropZone"
+    ondragover="handleDragOver(event)"
+    ondragleave="handleDragLeave(event)"
+    ondrop="handleDrop(event)">
+    <input type="file" accept=".xlsx,.xls,.txt,.tsv" onchange="handleFileSelect(event)">
+    <div class="drop-icon">📂</div>
+    <div class="drop-label">
+      <strong>Drop your export file here</strong> or click to browse
+      <span class="formats">.xlsx &nbsp;·&nbsp; .xls &nbsp;·&nbsp; .txt &nbsp;·&nbsp; .tsv</span>
+    </div>
+    <div class="drop-success" id="dropSuccess"></div>
+  </div>
+
+  <div class="intake-divider">
+    <hr><span>or paste manually</span><hr>
+  </div>
+
+  <textarea id="rawInput" placeholder="Paste tab-separated Enterworks export here…
+
+SKU	Name	Brand	Taxonomy Node	Model Code	Model Description	Model Bullet Text	Model Bullet Order	SKU Bullet Text	SKU Bullet Order
+ABC-001	Radar Cycling Computer, GPS, ANT+	Garmin	Cycling > Computers	RC-1000	The Varia RC500 keeps you aware of approaching vehicles...	Detects vehicles up to 140m away~Pairs with 150+ compatible devices~Radar + tail light combo	1~2~3		
+ABC-001-BLK	Radar Cycling Computer, GPS, ANT+ - Black	Garmin	Cycling > Computers	RC-1000	 	 	 	High-visibility black housing~Includes standard mount	1~2"></textarea>
+
+  <div class="intake-footer">
+    <span class="error-msg" id="errorMsg">⚠ Could not parse data — check format above</span>
+    <div style="display:flex; gap:10px; margin-left:auto;">
+      <button class="btn btn-ghost" onclick="loadDemo()">Load Demo Data</button>
+      <button class="btn btn-primary" onclick="parseAndRender()">Build Audit View →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── AUDIT VIEW ─── -->
+<div id="auditView">
+  <header>
+    <div>
+      <h1>Vendor Copy Audit</h1>
+      <div class="subtitle" id="auditSubtitle">— products loaded</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-ghost" onclick="resetToIntake()">← New Import</button>
+      <button class="btn btn-accent" onclick="openExport()">Export Results</button>
+    </div>
+  </header>
+
+  <div class="audit-toolbar">
+    <div class="stat-chip">Products: <span id="statProducts">0</span></div>
+    <div class="stat-chip">Approved: <span id="statApproved">0</span></div>
+    <div class="stat-chip">Rejected: <span id="statRejected">0</span></div>
+    <div class="stat-chip">Pending: <span id="statPending">0</span></div>
+    <div class="toolbar-right">
+      <button class="btn btn-ghost" style="font-size:10px;" onclick="approveAll()">Approve All</button>
+    </div>
+  </div>
+
+  <div class="products-container" id="productsContainer"></div>
+</div>
+
+<!-- ─── EXPORT MODAL ─── -->
+<div id="exportModal">
+  <div class="modal-box">
+    <h3>Export Audit Results</h3>
+    <p>Downloads a <strong>.xlsx</strong> with all original Enterworks columns plus <strong>Product Decision</strong> and <strong>Product Comment</strong>. Header row is bold with a dark background, autofilter enabled, and columns auto-sized. Ready to open directly in Excel.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeExport()">Cancel</button>
+      <button class="btn btn-primary" onclick="doExport()">Download .txt</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let products = [];
+
+// ─── FILE UPLOAD / DROP ───
+function handleDragOver(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.add('drag-over');
+}
+function handleDragLeave(e) {
+  document.getElementById('dropZone').classList.remove('drag-over');
+}
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+}
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (file) processFile(file);
+}
+
+function processFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  const successEl = document.getElementById('dropSuccess');
+  successEl.style.display = 'none';
+
+  if (ext === 'xlsx' || ext === 'xls') {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        // Convert to tab-separated text
+        const csv = XLSX.utils.sheet_to_csv(ws, { FS: '\t', RS: '\n' });
+        document.getElementById('rawInput').value = csv;
+        successEl.textContent = `✓ Loaded: ${file.name}`;
+        successEl.style.display = 'block';
+      } catch(err) {
+        document.getElementById('errorMsg').textContent = '⚠ Could not read Excel file — try saving as .txt';
+        document.getElementById('errorMsg').style.display = 'block';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    // Plain text / TSV
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById('rawInput').value = e.target.result;
+      successEl.textContent = `✓ Loaded: ${file.name}`;
+      successEl.style.display = 'block';
+    };
+    reader.readAsText(file);
+  }
+}
+
+
+function parseRows(raw) {
+  const lines = raw.trim().split('\n').map(l => l.trimEnd());
+  if (!lines.length) return [];
+
+  // Detect header row
+  let start = 0;
+  const first = lines[0].split('\t').map(c => c.trim().toLowerCase());
+  const headerKeywords = ['sku','name','brand','taxonomy','model code','model description','bullet'];
+  const matchCount = first.filter(c => headerKeywords.some(k => c.includes(k))).length;
+  if (matchCount >= 2) start = 1;
+
+  const rows = [];
+  for (let i = start; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const cols = lines[i].split('\t');
+    rows.push({
+      sku: (cols[0]||'').trim(),
+      name: (cols[1]||'').trim(),
+      brand: (cols[2]||'').trim(),
+      taxonomy: (cols[3]||'').trim(),
+      modelCode: (cols[4]||'').trim(),
+      modelDesc: (cols[5]||'').trim(),
+      modelBulletText: (cols[6]||'').trim(),
+      modelBulletOrder: (cols[7]||'').trim(),
+      skuBulletText: (cols[8]||'').trim(),
+      skuBulletOrder: (cols[9]||'').trim(),
+    });
+  }
+  return rows;
+}
+
+function groupIntoProducts(rows) {
+  // Group rows by "product" — heuristic: a new product starts when we have a name
+  // and the previous product's model row had a model description or it's first.
+  // Simpler: cluster by shared name prefix / shared modelCode, or just treat
+  // consecutive rows with same Name (or same base SKU prefix) as one product.
+  // Most robust: first row with modelDesc = model row; subsequent rows with same
+  // name fragment = SKU rows of that product.
+
+  const prods = [];
+  let current = null;
+
+  for (const row of rows) {
+    const hasModelContent = row.modelDesc || row.modelBulletText;
+    const hasSkuContent = row.skuBulletText;
+    const sameName = current && (row.name === current.name || (!row.name && current));
+
+    if (hasModelContent || !sameName) {
+      // Start new product
+      current = {
+        name: row.name || (current ? current.name : ''),
+        brand: row.brand || (current ? current.brand : ''),
+        taxonomy: row.taxonomy || (current ? current.taxonomy : ''),
+        modelCode: row.modelCode,
+        modelRow: row,
+        skuRows: [],
+      };
+      prods.push(current);
+    } else {
+      if (current) current.skuRows.push(row);
+    }
+  }
+  return prods;
+}
+
+// ─── RENDER ───
+function bulletsFromTilde(text) {
+  if (!text) return [];
+  return text.split('~').map(b => b.trim()).filter(Boolean);
+}
+
+function renderBullets(bullets) {
+  return bullets.join('\n');
+}
+
+// Info-only row: editable text + comment, no status buttons
+function makeInfoRow(labelText, value, fieldId, commentId) {
+  return `<div class="field-row field-row-info">
+    <div class="field-label">${labelText}</div>
+    <div class="field-content"><textarea class="field-editable" id="${fieldId}" rows="1" oninput="autoResize(this)">${escHtml(value)}</textarea></div>
+    <div class="field-comment"><textarea id="${commentId}" placeholder="Comment…" rows="1" oninput="autoResize(this)"></textarea></div>
+    <div class="field-status"></div>
+  </div>`;
+}
+
+function makeFieldRow(labelText, value, fieldId, multiline, commentId, statusId, isBullet) {
+  const textarea = multiline
+    ? `<textarea class="field-editable${isBullet ? ' bullet-field' : ''}" id="${fieldId}" rows="${Math.max(2, (value.match(/\n/g)||[]).length + 1)}" oninput="autoResize(this)">${escHtml(value)}</textarea>`
+    : `<textarea class="field-editable" id="${fieldId}" rows="1" oninput="autoResize(this)">${escHtml(value)}</textarea>`;
+
+  return `<div class="field-row">
+    <div class="field-label">${labelText}</div>
+    <div class="field-content">${textarea}</div>
+    <div class="field-comment"><textarea id="${commentId}" placeholder="Comment…" rows="1" oninput="autoResize(this)"></textarea></div>
+    <div class="field-status">
+      <div class="approval-group">
+        <button class="approval-btn" id="${statusId}-ok" onclick="setFieldStatus('${statusId}','ok')">✓ OK</button>
+        <button class="approval-btn" id="${statusId}-flag" onclick="setFieldStatus('${statusId}','flag')">⚑ Flag</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderProduct(prod, idx) {
+  const pid = `p${idx}`;
+  const mr = prod.modelRow;
+  const modelBullets = bulletsFromTilde(mr.modelBulletText);
+
+  let html = `<div class="product-card" id="${pid}-card">
+    <div class="product-header">
+      <div class="product-header-left">
+        <div class="product-number">Product ${idx + 1}</div>
+        <div class="product-title">${escHtml(prod.name || mr.name || '—')}</div>
+        <div class="product-meta">
+          Brand: <span>${escHtml(prod.brand)}</span>
+          ${prod.modelCode ? `&nbsp;·&nbsp; Model Code: <span>${escHtml(prod.modelCode)}</span>` : ''}
+        </div>
+      </div>
+    </div>`;
+
+  // Model section
+  html += `<div class="section-label">Model-Level Content &nbsp;·&nbsp; SKU: ${escHtml(mr.sku || '—')}</div>`;
+  html += makeInfoRow('Name / Title', mr.name || prod.name, `${pid}-m-name`, `${pid}-m-name-c`);
+  html += makeInfoRow('Brand', mr.brand || prod.brand, `${pid}-m-brand`, `${pid}-m-brand-c`);
+  html += makeFieldRow('Model Description', mr.modelDesc, `${pid}-m-desc`, true, `${pid}-m-desc-c`, `${pid}-m-desc-s`, false);
+  html += makeFieldRow('Model Bullets', renderBullets(modelBullets), `${pid}-m-bullets`, true, `${pid}-m-bullets-c`, `${pid}-m-bullets-s`, true);
+
+  // SKU rows
+  if (prod.skuRows.length) {
+    prod.skuRows.forEach((sr, si) => {
+      const skuBullets = bulletsFromTilde(sr.skuBulletText);
+      html += `<div class="section-label sku-label">SKU-Level Content &nbsp;·&nbsp; ${escHtml(sr.sku || `SKU ${si+1}`)}</div>`;
+      html += makeFieldRow('SKU Bullets', renderBullets(skuBullets), `${pid}-s${si}-bullets`, true, `${pid}-s${si}-bullets-c`, `${pid}-s${si}-bullets-s`, true);
+    });
+  }
+
+  // Product-level approval banner
+  html += `<div class="approval-banner">
+    <span class="approval-banner-label">Product Decision</span>
+    <div class="approval-options">
+      <button class="approve-product-btn" id="${pid}-approve" onclick="setProductStatus('${pid}','approved')">✓ Approved</button>
+      <button class="reject-product-btn" id="${pid}-reject" onclick="setProductStatus('${pid}','rejected')">✗ Needs Revision</button>
+    </div>
+    <input class="overall-comment" id="${pid}-overall-comment" type="text" placeholder="Overall comment for this product…" oninput="updateStats()">
+  </div>`;
+
+  html += `</div>`;
+  return html;
+}
+
+function parseAndRender() {
+  const raw = document.getElementById('rawInput').value;
+  const rows = parseRows(raw);
+  if (!rows.length) {
+    document.getElementById('errorMsg').style.display = 'block';
+    return;
+  }
+  document.getElementById('errorMsg').style.display = 'none';
+
+  products = groupIntoProducts(rows);
+  if (!products.length) {
+    document.getElementById('errorMsg').style.display = 'block';
+    return;
+  }
+
+  const container = document.getElementById('productsContainer');
+  container.innerHTML = products.map((p,i) => renderProduct(p,i)).join('');
+
+  document.getElementById('statProducts').textContent = products.length;
+  document.getElementById('auditSubtitle').textContent = `${products.length} product${products.length !== 1 ? 's' : ''} loaded`;
+
+  // Auto-resize all textareas
+  setTimeout(() => {
+    document.querySelectorAll('textarea').forEach(autoResize);
+  }, 50);
+
+  document.getElementById('intake').style.display = 'none';
+  document.getElementById('auditView').style.display = 'block';
+  updateStats();
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = (el.scrollHeight) + 'px';
+}
+
+// ─── STATUS ───
+function setFieldStatus(statusId, val) {
+  const okBtn = document.getElementById(`${statusId}-ok`);
+  const flagBtn = document.getElementById(`${statusId}-flag`);
+  okBtn.classList.remove('active-approve');
+  flagBtn.classList.remove('active-reject');
+  if (val === 'ok') okBtn.classList.add('active-approve');
+  if (val === 'flag') flagBtn.classList.add('active-reject');
+}
+
+function setProductStatus(pid, val) {
+  const appBtn = document.getElementById(`${pid}-approve`);
+  const rejBtn = document.getElementById(`${pid}-reject`);
+  const card = document.getElementById(`${pid}-card`);
+  appBtn.classList.remove('active');
+  rejBtn.classList.remove('active');
+  if (val === 'approved') {
+    appBtn.classList.add('active');
+    card.style.borderColor = 'var(--approve-border)';
+  } else {
+    rejBtn.classList.add('active');
+    card.style.borderColor = 'var(--reject-border)';
+  }
+  updateStats();
+}
+
+function updateStats() {
+  let approved = 0, rejected = 0;
+  products.forEach((p, i) => {
+    const pid = `p${i}`;
+    const appBtn = document.getElementById(`${pid}-approve`);
+    const rejBtn = document.getElementById(`${pid}-reject`);
+    if (appBtn && appBtn.classList.contains('active')) approved++;
+    else if (rejBtn && rejBtn.classList.contains('active')) rejected++;
+  });
+  document.getElementById('statApproved').textContent = approved;
+  document.getElementById('statRejected').textContent = rejected;
+  document.getElementById('statPending').textContent = products.length - approved - rejected;
+}
+
+function approveAll() {
+  products.forEach((p, i) => setProductStatus(`p${i}`, 'approved'));
+}
+
+// ─── EXPORT ───
+function openExport() { document.getElementById('exportModal').classList.add('open'); }
+function closeExport() { document.getElementById('exportModal').classList.remove('open'); }
+
+function getFieldStatus(statusId) {
+  if (document.getElementById(`${statusId}-flag`)?.classList.contains('active-reject')) return 'Flagged';
+  if (document.getElementById(`${statusId}-ok`)?.classList.contains('active-approve')) return 'OK';
+  return '';
+}
+
+function collectRows() {
+  const headers = [
+    'SKU','Name','Brand','Taxonomy Node','Model Code',
+    'Model Description','Desc Status','Desc Comment',
+    'Model Bullet Text','Model Bullet Order','Bullets Status','Bullets Comment',
+    'SKU Bullet Text','SKU Bullet Order','SKU Bullets Status','SKU Bullets Comment',
+    'Product Decision','Product Comment'
+  ];
+  const rows = [headers];
+
+  products.forEach((prod, i) => {
+    const pid = `p${i}`;
+    const mr = prod.modelRow;
+    const decision = document.getElementById(`${pid}-approve`)?.classList.contains('active') ? 'Approved'
+      : document.getElementById(`${pid}-reject`)?.classList.contains('active') ? 'Needs Revision'
+      : 'Pending';
+    const overallComment = document.getElementById(`${pid}-overall-comment`)?.value || '';
+
+    const mBullets = (document.getElementById(`${pid}-m-bullets`)?.value || '').split('\n').filter(Boolean).join('~');
+    const mBulletOrder = mBullets.split('~').filter(Boolean).map((_,n)=>n+1).join('~');
+
+    rows.push([
+      mr.sku,
+      document.getElementById(`${pid}-m-name`)?.value || mr.name,
+      document.getElementById(`${pid}-m-brand`)?.value || mr.brand,
+      mr.taxonomy, mr.modelCode,
+      document.getElementById(`${pid}-m-desc`)?.value || mr.modelDesc,
+      getFieldStatus(`${pid}-m-desc-s`),
+      document.getElementById(`${pid}-m-desc-c`)?.value || '',
+      mBullets, mBulletOrder,
+      getFieldStatus(`${pid}-m-bullets-s`),
+      document.getElementById(`${pid}-m-bullets-c`)?.value || '',
+      '', '', '', '',
+      decision, overallComment
+    ]);
+
+    prod.skuRows.forEach((sr, si) => {
+      const skuBullets = (document.getElementById(`${pid}-s${si}-bullets`)?.value || '').split('\n').filter(Boolean).join('~');
+      const skuBulletOrder = skuBullets.split('~').filter(Boolean).map((_,n)=>n+1).join('~');
+      rows.push([
+        sr.sku, sr.name, sr.brand, sr.taxonomy, sr.modelCode, sr.modelDesc,
+        '', '', '', '', '', '',
+        skuBullets, skuBulletOrder,
+        getFieldStatus(`${pid}-s${si}-bullets-s`),
+        document.getElementById(`${pid}-s${si}-bullets-c`)?.value || '',
+        decision, overallComment
+      ]);
+    });
+  });
+  return rows;
+}
+
+function doExport() {
+  const rows = collectRows();
+  const filename = `vendor-audit-${new Date().toISOString().slice(0,10)}.xlsx`;
+
+  // Use SheetJS (already loaded for file upload)
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // Auto column widths
+  ws['!cols'] = rows[0].map((_, ci) => {
+    const max = rows.reduce((m, r) => Math.max(m, String(r[ci]||'').length), 0);
+    return { wch: Math.min(Math.max(max, 10), 60) };
+  });
+
+  // Freeze header row
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Audit');
+
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+  const a = document.createElement('a');
+  a.href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${wbout}`;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  closeExport();
+}
+
+// ─── NAVIGATION ───
+function resetToIntake() {
+  document.getElementById('auditView').style.display = 'none';
+  document.getElementById('intake').style.display = 'block';
+  products = [];
+}
+
+// ─── DEMO DATA ───
+function loadDemo() {
+  document.getElementById('rawInput').value = [
+    'SKU\tName\tBrand\tTaxonomy Node\tModel Code\tModel Description\tModel Bullet Text\tModel Bullet Order\tSKU Bullet Text\tSKU Bullet Order',
+    'GRM-VRC500\tGarmin Varia RCT715 Rearview Radar Camera\tGarmin\tCycling > Electronics > Cameras & Radar\tRCT715\tThe Varia RCT715 combines a rearview camera with vehicle radar detection so you can see and hear approaching traffic before it reaches you. The integrated tail light adds 65 lumens of rear visibility, ensuring you are seen as well as aware.\tDetects vehicles up to 140m behind you~Streams live rearview video to compatible Garmin devices~Built-in tail light with 65-lumen output~ANT+ and Bluetooth wireless connectivity~Compatible with 150+ Edge and epix devices\t1~2~3~4~5\t\t',
+    'GRM-VRC500-BLK\tGarmin Varia RCT715 Rearview Radar Camera - Black\tGarmin\tCycling > Electronics > Cameras & Radar\tRCT715\t\t\t\tMatte black finish with high-contrast lens~Includes standard seatpost mount and locking mount\t1~2',
+    'GRM-VRC500-WHT\tGarmin Varia RCT715 Rearview Radar Camera - White\tGarmin\tCycling > Electronics > Cameras & Radar\tRCT715\t\t\t\tWhite colorway matches Garmin Edge 540 housing~Includes standard seatpost mount and locking mount\t1~2',
+    'BBB-CL12\tBBB Cycling BHD-128 CloseCall Radar Tail Light\tBBB Cycling\tCycling > Lighting > Tail Lights\tBHD-128\tThe CloseCall radar tail light gives audible and visual alerts when vehicles approach from behind, letting you react before you hear the engine. Rechargeable via USB-C with up to 8 hours of combined radar and light runtime.\tRadar detection range up to 100m~Audible and visual proximity alert~8-hour runtime in combined radar + light mode~USB-C rechargeable — no proprietary cables~IPX5 water resistance rating\t1~2~3~4~5\t\t',
+  ].join('\n');
+}
+
+function escHtml(str) {
+  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
