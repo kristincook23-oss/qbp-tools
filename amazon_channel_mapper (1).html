@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Amazon Channel Mapper · QBP Content Tools</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,300;9..144,600;9..144,700&display=swap');
+  :root {
+    --bg:#f7f3ee;--surface:#fdfaf6;--surface2:#f2ede6;--border:#ddd6cc;
+    --accent:#b8621a;--accent2:#2e7d64;--accent3:#b03a54;
+    --text:#2c2520;--text-muted:#7a6e65;--text-dim:#bdb3a8;
+    --mapped:#e8f4f0;--mapped-border:#7bbfac;--warn:#fdf3e7;--warn-border:#d4933a;--tag-bg:#ede8e1;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;line-height:1.6;min-height:100vh;}
+  header{background:var(--surface);border-bottom:1px solid var(--border);padding:18px 28px;display:flex;align-items:center;gap:20px;position:sticky;top:0;z-index:100;}
+  .logo-suite{font-family:'Fraunces',serif;font-weight:300;font-size:11px;color:var(--text-muted);letter-spacing:0.12em;text-transform:uppercase;}
+  .logo-tool{font-family:'Fraunces',serif;font-weight:700;font-size:18px;color:var(--accent);letter-spacing:-0.02em;}
+  .logo-divider{width:1px;height:32px;background:var(--border);}
+  .header-meta{font-size:11px;color:var(--text-muted);}
+  .header-badge{margin-left:auto;background:var(--warn);border:1px solid var(--warn-border);color:var(--accent);font-size:10px;padding:3px 10px;border-radius:2px;letter-spacing:0.08em;text-transform:uppercase;}
+  .main{display:grid;grid-template-columns:320px 1fr;height:calc(100vh - 61px);}
+  .sidebar{background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column;}
+  .sidebar-section{padding:18px 20px;border-bottom:1px solid var(--border);}
+  .sidebar-section:last-child{border-bottom:none;flex:1;}
+  .sidebar-label{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+  .sidebar-label::after{content:'';flex:1;height:1px;background:var(--border);}
+  /* mode indicator */
+  .mode-badge{display:flex;align-items:center;gap:7px;padding:8px 10px;border-radius:4px;font-size:11px;margin-bottom:10px;}
+  .mode-badge.rule{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);}
+  .mode-badge.ai{background:var(--mapped);border:1px solid var(--mapped-border);color:var(--accent2);}
+  .mode-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+  .mode-dot.rule{background:var(--text-dim);}
+  .mode-dot.ai{background:var(--accent2);}
+  /* api key */
+  .api-toggle{font-size:11px;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;padding:2px 0;}
+  .api-toggle:hover{color:var(--accent);}
+  .api-chevron{font-size:9px;transition:transform .2s;display:inline-block;}
+  .api-chevron.open{transform:rotate(90deg);}
+  .api-body{display:none;margin-top:10px;}
+  .api-body.open{display:block;}
+  .api-row{display:flex;gap:6px;margin-bottom:6px;}
+  .api-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:7px 10px;font-family:'DM Mono',monospace;font-size:11px;color:var(--text);outline:none;transition:border-color .15s;}
+  .api-input:focus{border-color:var(--accent);}
+  .api-input::placeholder{color:var(--text-dim);}
+  .api-save-btn{background:var(--tag-bg);border:1px solid var(--border);border-radius:4px;padding:7px 10px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);cursor:pointer;transition:all .15s;white-space:nowrap;text-transform:uppercase;letter-spacing:.06em;}
+  .api-save-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .api-status{font-size:10px;line-height:1.5;color:var(--text-dim);}
+  .api-status.ok{color:var(--accent2);}
+  .api-status.bad{color:var(--accent3);}
+  /* uploads */
+  .upload-zone{border:1px dashed var(--border);border-radius:6px;padding:14px;text-align:center;cursor:pointer;transition:all .2s;color:var(--text-muted);font-size:12px;background:var(--bg);display:block;}
+  .upload-zone:hover{border-color:var(--accent);color:var(--accent);}
+  .upload-zone.loaded{border-color:var(--mapped-border);color:var(--accent2);background:var(--mapped);border-style:solid;}
+  .upload-zone.tpl-loaded{border-color:var(--warn-border);color:var(--accent);background:var(--warn);border-style:solid;}
+  .upload-zone input{display:none;}
+  .upload-icon{font-size:18px;margin-bottom:4px;}
+  .upload-hint{font-size:10px;margin-top:3px;color:var(--text-dim);}
+  .upload-filename{font-size:10px;margin-top:4px;word-break:break-all;}
+  .upload-filename.amber{color:var(--accent);}
+  .upload-filename.green{color:var(--accent2);}
+  .category-badge{display:inline-block;background:var(--warn);border:1px solid var(--warn-border);border-radius:3px;padding:3px 10px;font-size:11px;color:var(--accent);margin-top:6px;}
+  /* stats */
+  .stat-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;}
+  .stat-label{color:var(--text-muted);font-size:12px;}
+  .stat-val{font-size:12px;}
+  .stat-val.green{color:var(--accent2);}
+  .stat-val.amber{color:var(--accent);}
+  .stat-val.red{color:var(--accent3);}
+  .progress-bar-wrap{background:var(--bg);border:1px solid var(--border);border-radius:2px;height:5px;overflow:hidden;margin:8px 0;}
+  .progress-bar{height:100%;background:var(--accent2);border-radius:2px;transition:width .5s;}
+  .run-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:4px;padding:11px;font-family:'DM Mono',monospace;font-size:12px;font-weight:500;letter-spacing:.06em;cursor:pointer;text-transform:uppercase;transition:opacity .2s;margin-top:12px;}
+  .run-btn:hover{opacity:.85;}
+  .run-btn:disabled{opacity:.35;cursor:not-allowed;}
+  .export-btn{width:100%;background:transparent;color:var(--accent2);border:1px solid var(--mapped-border);border-radius:4px;padding:9px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all .2s;margin-top:8px;text-transform:uppercase;letter-spacing:.06em;}
+  .export-btn:hover{background:var(--mapped);}
+  .export-btn:disabled{opacity:.3;cursor:not-allowed;}
+  /* main panel */
+  .content{overflow-y:auto;display:flex;flex-direction:column;}
+  .tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:50;}
+  .tab{padding:14px 22px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;}
+  .tab:hover{color:var(--text);}
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .tab-count{display:inline-block;background:var(--tag-bg);border-radius:2px;padding:1px 5px;font-size:10px;margin-left:5px;}
+  .tab-panel{display:none;padding:24px;flex:1;}
+  .tab-panel.active{display:block;}
+  /* table */
+  .mapping-table{width:100%;border-collapse:collapse;}
+  .mapping-table th{text-align:left;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);padding:8px 12px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;}
+  .mapping-table td{padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:top;font-size:12px;}
+  .mapping-table tr:hover td{background:var(--surface2);}
+  .field-name{font-family:'DM Mono',monospace;color:var(--text);font-size:11px;}
+  .source-pill{display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:2px 7px;font-size:10px;color:var(--text-muted);font-family:'DM Mono',monospace;}
+  .source-pill.amazon{border-color:#d4823a;color:#b8621a;background:var(--warn);}
+  .source-pill.catalog{border-color:var(--mapped-border);color:var(--accent2);background:var(--mapped);}
+  .source-pill.both{border-color:#aaa;color:#666;background:var(--surface2);}
+  .source-pill.derived{border-color:#9b7de0;color:#7b5ec0;background:#f4f0ff;}
+  .source-pill.manual{border-color:var(--accent3);color:var(--accent3);background:#fdf0f3;}
+  .status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;}
+  .s-mapped{background:var(--accent2);}
+  .s-derived{background:#9b7de0;}
+  .s-manual{background:var(--accent3);}
+  .s-unmapped{background:var(--text-dim);}
+  .conf-wrap{background:var(--surface2);border-radius:2px;height:4px;width:50px;display:inline-block;vertical-align:middle;margin-left:4px;overflow:hidden;}
+  .conf-bar{height:100%;border-radius:2px;}
+  .notes-cell{color:var(--text-muted);font-size:11px;max-width:200px;}
+  /* preview */
+  .preview-card{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:18px;margin-bottom:14px;}
+  .preview-card-label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px;}
+  .preview-field{display:flex;gap:12px;margin-bottom:8px;align-items:flex-start;}
+  .preview-key{min-width:200px;font-size:11px;color:var(--text-muted);padding-top:1px;}
+  .preview-val{font-size:12px;color:var(--text);flex:1;word-break:break-word;}
+  .preview-val.empty{color:var(--text-dim);font-style:italic;}
+  .char-count{font-size:10px;color:var(--text-muted);margin-left:6px;}
+  .char-count.over{color:var(--accent3);font-weight:500;}
+  /* issues */
+  .issue-row{display:flex;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);align-items:flex-start;font-size:12px;}
+  .issue-type{min-width:60px;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.08em;padding-top:1px;}
+  .issue-type.error{color:var(--accent3);}
+  .issue-type.warn{color:var(--accent);}
+  .issue-type.info{color:var(--accent2);}
+  .issue-field{color:var(--text);min-width:160px;font-family:'DM Mono',monospace;font-size:11px;}
+  .issue-msg{color:var(--text-muted);flex:1;}
+  /* empty / loading */
+  .empty-state{text-align:center;padding:60px 20px;}
+  .empty-state h2{font-family:'Fraunces',serif;font-weight:300;font-size:22px;color:var(--text-muted);margin-bottom:10px;}
+  .empty-state p{font-size:12px;max-width:400px;margin:0 auto;line-height:1.8;color:var(--text-muted);}
+  .step-list{counter-reset:step;text-align:left;display:inline-block;margin-top:16px;}
+  .step-list li{font-size:12px;color:var(--text-muted);padding:3px 0 3px 22px;list-style:none;position:relative;}
+  .step-list li::before{content:counter(step);counter-increment:step;position:absolute;left:0;color:var(--accent);font-weight:500;}
+  .loading-state{text-align:center;padding:60px 20px;}
+  .spinner{display:inline-block;width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:14px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading-msg{font-size:12px;color:var(--text-muted);}
+  .loading-sub{font-size:11px;color:var(--text-dim);margin-top:4px;}
+  /* misc */
+  .section-hdr{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted);padding:14px 0 8px;border-bottom:1px solid var(--border);margin-bottom:14px;}
+  .info-box{background:var(--warn);border:1px solid var(--warn-border);border-radius:5px;padding:12px 14px;font-size:12px;color:var(--text-muted);line-height:1.7;margin-bottom:14px;}
+  .info-box strong{color:var(--accent);}
+  .rule-note{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:10px 12px;font-size:11px;color:var(--text-muted);margin-bottom:16px;line-height:1.6;}
+  .rule-note strong{color:var(--text);}
+  ::-webkit-scrollbar{width:6px;height:6px;}
+  ::-webkit-scrollbar-track{background:var(--bg);}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo-suite">QBP Content Tools</div>
+    <div class="logo-tool">Amazon Channel Mapper</div>
+  </div>
+  <div class="logo-divider"></div>
+  <div class="header-meta" id="header-category">Upload an Amazon flat file template to begin</div>
+  <div class="header-badge">Proof of Concept</div>
+</header>
+
+<div class="main">
+  <aside class="sidebar">
+
+    <!-- MAPPING MODE + OPTIONAL API KEY -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Mapping Mode</div>
+      <div id="mode-indicator" class="mode-badge rule">
+        <span class="mode-dot rule" id="mode-dot"></span>
+        <span id="mode-label">Rule-based · No API key</span>
+      </div>
+      <div class="api-toggle" onclick="toggleApiPanel()">
+        <span class="api-chevron" id="api-chevron">▶</span>
+        Add Claude API key for smarter mapping <em style="font-size:10px;">(optional)</em>
+      </div>
+      <div class="api-body" id="api-body">
+        <div class="api-row">
+          <input class="api-input" type="password" id="api-key" placeholder="sk-ant-…" autocomplete="off">
+          <button class="api-save-btn" onclick="saveKey()">Save</button>
+        </div>
+        <div class="api-status" id="api-status">Claude handles tilde-splits, unit conversions, and ambiguous fields that the rule engine may miss.</div>
+      </div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Step 1 — Amazon Flat File Template</div>
+      <label class="upload-zone" id="zone-template">
+        <input type="file" id="file-template" accept=".xls,.xlsx,.csv">
+        <div class="upload-icon">📋</div>
+        <div>Drop Amazon category template</div>
+        <div class="upload-hint">Download from Seller Central → Add Products → Spreadsheet</div>
+        <div class="upload-filename amber" id="fn-template"></div>
+      </label>
+      <div id="cat-badge-wrap" style="display:none;"><div class="category-badge" id="cat-badge"></div></div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Step 2 — QBP Amazon Export</div>
+      <label class="upload-zone" id="zone-amazon">
+        <input type="file" id="file-amazon" accept=".xls,.xlsx,.csv">
+        <div class="upload-icon">📦</div>
+        <div>Drop Amazon product export</div>
+        <div class="upload-hint">QBP_Amazon_Product_Export*.xls</div>
+        <div class="upload-filename green" id="fn-amazon"></div>
+      </label>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Step 3 — Category Attribute Export</div>
+      <label class="upload-zone" id="zone-catalog">
+        <input type="file" id="file-catalog" accept=".xls,.xlsx,.csv">
+        <div class="upload-icon">🗂</div>
+        <div>Drop Enterworks category export</div>
+        <div class="upload-hint">QBP_Product_Catalog_*Category*.xls</div>
+        <div class="upload-filename green" id="fn-catalog"></div>
+      </label>
+    </div>
+
+    <!-- STATS + ACTIONS -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Mapping Summary</div>
+      <div class="stat-row"><span class="stat-label">Template fields</span><span class="stat-val" id="st-total">—</span></div>
+      <div class="stat-row"><span class="stat-label">Required fields</span><span class="stat-val red" id="st-req">—</span></div>
+      <div class="stat-row"><span class="stat-label">Auto-mapped</span><span class="stat-val green" id="st-mapped">—</span></div>
+      <div class="stat-row"><span class="stat-label">Needs transform</span><span class="stat-val amber" id="st-derived">—</span></div>
+      <div class="stat-row"><span class="stat-label">Manual / missing</span><span class="stat-val red" id="st-manual">—</span></div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="prog-bar" style="width:0%"></div></div>
+      <button class="run-btn" id="btn-run" disabled onclick="runMapping()">▶ Run Mapping</button>
+      <button class="export-btn" id="btn-export" disabled onclick="exportCSV()">↓ Export Mapped CSV</button>
+    </div>
+
+  </aside>
+
+  <main class="content">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab(0)">Field Map <span class="tab-count" id="cnt-map">—</span></div>
+      <div class="tab" onclick="switchTab(1)">Preview Output <span class="tab-count" id="cnt-prev">—</span></div>
+      <div class="tab" onclick="switchTab(2)">Issues <span class="tab-count" id="cnt-issues">—</span></div>
+      <div class="tab" onclick="switchTab(3)">Template Fields <span class="tab-count" id="cnt-tpl">—</span></div>
+    </div>
+
+    <!-- FIELD MAP TAB -->
+    <div id="tab-0" class="tab-panel active">
+      <div id="map-empty" class="empty-state">
+        <h2>Three uploads, then map</h2>
+        <p>Works without an API key using rule-based column matching. Add a Claude API key for smarter handling of transforms, unit conversions, and ambiguous fields — both modes use the actual Amazon template you upload.</p>
+        <ol class="step-list">
+          <li>Download the flat file template for your category from Seller Central</li>
+          <li>Upload your QBP Amazon product export</li>
+          <li>Upload the matching Enterworks category attribute export</li>
+          <li>Hit Run Mapping</li>
+        </ol>
+      </div>
+      <div id="map-loading" class="loading-state" style="display:none;">
+        <div class="spinner"></div>
+        <div class="loading-msg" id="loading-msg">Running mapping…</div>
+        <div class="loading-sub" id="loading-sub"></div>
+      </div>
+      <div id="map-table-wrap" style="display:none;">
+        <div id="map-mode-note"></div>
+        <table class="mapping-table">
+          <thead><tr><th>Amazon Template Field</th><th>Requirement</th><th>Status</th><th>Source</th><th>Maps From</th><th>Notes / Transform</th></tr></thead>
+          <tbody id="map-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PREVIEW TAB -->
+    <div id="tab-1" class="tab-panel">
+      <div id="preview-empty" class="empty-state"><h2>No preview yet</h2><p>Run the mapping to see how your first product row will look filled into the Amazon template.</p></div>
+      <div id="preview-content" style="display:none;"></div>
+    </div>
+
+    <!-- ISSUES TAB -->
+    <div id="tab-2" class="tab-panel">
+      <div id="issues-empty" class="empty-state"><h2>No issues found</h2><p>Run the mapping to check for missing required fields, character limit violations, and data quality problems.</p></div>
+      <div id="issues-list" style="display:none;"></div>
+    </div>
+
+    <!-- TEMPLATE FIELDS TAB -->
+    <div id="tab-3" class="tab-panel">
+      <div id="tpl-empty" class="empty-state"><h2>No template loaded</h2><p>Upload an Amazon flat file template (Step 1) to see all its fields, descriptions, and valid values here — works for any category.</p></div>
+      <div id="tpl-content" style="display:none;"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────
+var amazonRows=[],catalogRows=[],templateFields=[],amazonCols=[],catalogCols=[];
+var mappingResult=[],issues=[],detectedCategory='';
+var apiKey=localStorage.getItem('qbp_amz_key')||'';
+
+(function init(){
+  if(apiKey){document.getElementById('api-key').value=apiKey;updateApiStatus();updateModeIndicator();}
+})();
+
+// ── API key / mode ────────────────────────────────────────────
+function toggleApiPanel(){
+  var body=document.getElementById('api-body');
+  var chevron=document.getElementById('api-chevron');
+  var open=body.classList.toggle('open');
+  chevron.classList.toggle('open',open);
+}
+function saveKey(){
+  apiKey=document.getElementById('api-key').value.trim();
+  localStorage.setItem('qbp_amz_key',apiKey);
+  updateApiStatus();
+  updateModeIndicator();
+}
+function updateApiStatus(){
+  var el=document.getElementById('api-status');
+  if(apiKey&&apiKey.startsWith('sk-ant-')){
+    el.textContent='✓ API key saved — Claude mapping enabled';el.className='api-status ok';
+  } else if(apiKey){
+    el.textContent='⚠ Key format looks off (should start with sk-ant-)';el.className='api-status bad';
+  } else {
+    el.textContent='Claude handles tilde-splits, unit conversions, and ambiguous fields that the rule engine may miss.';el.className='api-status';
+  }
+}
+function isClaudeReady(){return !!(apiKey&&apiKey.startsWith('sk-ant-'));}
+function updateModeIndicator(){
+  var ind=document.getElementById('mode-indicator');
+  var dot=document.getElementById('mode-dot');
+  var lbl=document.getElementById('mode-label');
+  if(isClaudeReady()){
+    ind.className='mode-badge ai';dot.className='mode-dot ai';lbl.textContent='Claude AI mapping · Key saved';
+  } else {
+    ind.className='mode-badge rule';dot.className='mode-dot rule';lbl.textContent='Rule-based · No API key';
+  }
+}
+
+// ── File reading ──────────────────────────────────────────────
+function readXLS(file,cb){
+  var r=new FileReader();
+  r.onload=function(e){cb(XLSX.read(e.target.result,{type:'binary'}));};
+  r.readAsBinaryString(file);
+}
+function sheetToObjRows(wb,sn){
+  var ws=wb.Sheets[sn];
+  var raw=XLSX.utils.sheet_to_json(ws,{defval:'',header:1});
+  if(!raw.length)return{rows:[],cols:[]};
+  var headers=raw[0].map(String);
+  var rows=raw.slice(1).map(function(row){
+    var o={};headers.forEach(function(h,i){o[h]=row[i]!==undefined?row[i]:'';});return o;
+  });
+  return{rows:rows,cols:headers};
+}
+function parseTemplate(wb){
+  // Skip instruction/cover sheets, pick first data sheet
+  var best=wb.SheetNames[0];
+  for(var i=0;i<wb.SheetNames.length;i++){
+    var nl=wb.SheetNames[i].toLowerCase();
+    if(!nl.includes('instruction')&&!nl.includes('image')&&!nl.includes('cover')&&!nl.includes('example')&&!nl.includes('valid')){
+      best=wb.SheetNames[i];break;
+    }
+  }
+  var raw=XLSX.utils.sheet_to_json(wb.Sheets[best],{defval:'',header:1});
+  if(!raw||!raw.length)return[];
+  // Amazon flat files: row 0 = field names, row 1 = required/optional, row 2 = description, row 3 = valid values
+  var hdr=raw[0]||[],req=raw[1]||[],desc=raw[2]||[],valid=raw[3]||[];
+  var fields=[];
+  for(var i=0;i<hdr.length;i++){
+    var name=String(hdr[i]||'').trim();if(!name)continue;
+    var r=String(req[i]||'').toLowerCase().trim();
+    fields.push({name:name,required:r.includes('required')&&!r.includes('optional'),conditional:r.includes('conditional'),requirement:req[i]||'',description:desc[i]||'',validValues:valid[i]||''});
+  }
+  return fields;
+}
+function detectCategory(wb,filename){
+  for(var i=0;i<wb.SheetNames.length;i++){
+    var n=wb.SheetNames[i],nl=n.toLowerCase();
+    if(!nl.includes('instruction')&&!nl.includes('image')&&!nl.includes('cover')&&!nl.includes('valid')&&!nl.includes('example')&&n!=='Sheet1'&&n.length>2)return n;
+  }
+  return filename.replace(/\.(xlsx?|csv)$/i,'').replace(/_/g,' ').replace(/flat\s*file/i,'').trim()||'Amazon Template';
+}
+
+document.getElementById('file-template').addEventListener('change',function(e){
+  var f=e.target.files[0];if(!f)return;
+  readXLS(f,function(wb){
+    templateFields=parseTemplate(wb);detectedCategory=detectCategory(wb,f.name);
+    document.getElementById('fn-template').textContent=f.name;
+    document.getElementById('zone-template').classList.add('tpl-loaded');
+    document.getElementById('cat-badge').textContent='📂 '+detectedCategory;
+    document.getElementById('cat-badge-wrap').style.display='';
+    document.getElementById('header-category').textContent=detectedCategory+' · '+templateFields.length+' fields';
+    document.getElementById('cnt-tpl').textContent=templateFields.length;
+    renderTemplateGuide();checkReady();
+  });
+});
+document.getElementById('file-amazon').addEventListener('change',function(e){
+  var f=e.target.files[0];if(!f)return;
+  readXLS(f,function(wb){
+    var r=sheetToObjRows(wb,wb.SheetNames[0]);amazonRows=r.rows;amazonCols=r.cols;
+    document.getElementById('fn-amazon').textContent=f.name;
+    document.getElementById('zone-amazon').classList.add('loaded');checkReady();
+  });
+});
+document.getElementById('file-catalog').addEventListener('change',function(e){
+  var f=e.target.files[0];if(!f)return;
+  readXLS(f,function(wb){
+    var r=sheetToObjRows(wb,wb.SheetNames[0]);catalogRows=r.rows;catalogCols=r.cols;
+    document.getElementById('fn-catalog').textContent=f.name;
+    document.getElementById('zone-catalog').classList.add('loaded');checkReady();
+  });
+});
+
+function checkReady(){
+  document.getElementById('btn-run').disabled=!(templateFields.length>0&&amazonRows.length>0&&catalogRows.length>0);
+  updateModeIndicator();
+}
+
+// ── Rule-based mapping engine ─────────────────────────────────
+function norm(s){return String(s).toLowerCase().replace(/[^a-z0-9]/g,'');}
+
+function matchScore(amzField,srcCol){
+  var a=norm(amzField),s=norm(srcCol);
+  if(a===s)return 100;
+  if(a.includes(s)||s.includes(a))return 85;
+  var aw=amzField.toLowerCase().split(/[_\s]+/);
+  var sw=srcCol.toLowerCase().split(/[_\s\-\/]+/);
+  var overlap=aw.filter(function(w){
+    return w.length>2&&sw.some(function(sw2){return norm(sw2).includes(norm(w))||norm(w).includes(norm(sw2));});
+  });
+  if(overlap.length>=2)return 70;
+  if(overlap.length===1&&aw.length<=2)return 55;
+  return 0;
+}
+
+// Semantic aliases: Amazon field name → known QBP source column names
+var ALIASES={
+  'item_sku':['QBP Part Number','SKU'],
+  'item_name':['Name','Long Description'],
+  'external_product_id':['UPC'],
+  'brand_name':['Brand Name','Brand'],
+  'manufacturer':['Brand Name','Brand'],
+  'part_number':['Manufacturer Part Number'],
+  'color':['Defined Color___clsAttr_master_defined_color','Color___clsAttr_2'],
+  'standard_price':['MSRP Price'],
+  'sale_price':['MAP Price'],
+  'product_description':['Long Description','Model Overview'],
+  'generic_keywords':['keyword search___clsAttr_462'],
+  'item_length':['Length'],
+  'item_width':['Width'],
+  'item_height':['Height'],
+  'item_dimensions_unit_of_measure':['Length Width Height UOM'],
+  'item_weight':['Weight___clsAttr_10-g','Weight (oz)___clsAttr_weight_oz'],
+  'package_weight':['Weight'],
+  'package_weight_unit_of_measure':['Weight UOM'],
+  'main_image_url':['SKU Image Filename'],
+  'other_image_url1':['SKU Image Filename'],
+  'other_image_url2':['SKU Image Filename'],
+  'tire_bead_type':['Tire Bead___clsAttr_152'],
+  'tire_type':['Tire Type___clsAttr_208'],
+  'wheel_size':['Tire Diameter___clsAttr_209'],
+  'tire_size':['Labeled Size___clsAttr_160'],
+  'maximum_inflation_pressure':['PSI___clsAttr_PSI_Range'],
+  'sport_type':['Tire Intended Use___clsAttr_266'],
+  'compatible_devices':['Designed for ebike___clsAttr_designed_for_e-bike'],
+  'taxonomy_node_id':['Taxonomy Node'],
+  'bullet_point1':['Model Bullet Copy'],
+  'bullet_point2':['Model Bullet Copy'],
+  'bullet_point3':['SKU Bullet Copy'],
+  'bullet_point4':['SKU Bullet Copy'],
+};
+
+// Fixed constant values — no source column needed
+var CONSTANTS={
+  'external_product_id_type':'UPC',
+  'condition_type':'New',
+  'update_delete':'Update',
+  'feed_product_type':'[match to category]',
+};
+
+// Transform hints for fields that need logic even when a source column is found
+var TRANSFORM_HINTS={
+  'bullet_point1':'Split tilde-delimited Model Bullet Copy → item [0]',
+  'bullet_point2':'Split tilde-delimited Model Bullet Copy → item [1]',
+  'bullet_point3':'Split tilde-delimited SKU Bullet Copy → item [0]',
+  'bullet_point4':'Split tilde-delimited SKU Bullet Copy → item [1]',
+  'main_image_url':'Take first filename before ~ · prepend CDN base URL',
+  'other_image_url1':'Take second filename after ~ · prepend CDN base URL',
+  'other_image_url2':'Take third filename · prepend CDN base URL',
+  'item_weight':'Convert g ÷ 453.592 → LB, or use oz value directly',
+  'item_dimensions_unit_of_measure':'"IN" in source → "inches" per Amazon spec',
+  'maximum_inflation_pressure':'Parse high end of PSI range if format is "x-y"',
+  'sport_type':'Tilde-split; take first value; verify against Amazon valid values',
+  'compatible_devices':'Only populate if "Designed for ebike" = Yes → value: "E-Bike"',
+  'manufacturer':'Same value as brand_name for most bike products',
+};
+
+function ruleBasedMap(){
+  var amazonColSet=new Set(amazonCols);
+  var catalogColSet=new Set(catalogCols);
+  var allCols=amazonCols.concat(catalogCols);
+
+  return templateFields.map(function(tf){
+    var amz=tf.name;
+
+    // 1. Constant?
+    if(CONSTANTS[amz]){
+      return{amz:amz,required:tf.required,status:'derived',source:'derived',
+        from:'→ constant: "'+CONSTANTS[amz]+'"',note:'Fixed value — no source column needed.',confidence:100};
+    }
+
+    // 2. Alias lookup (highest priority — uses known QBP column names)
+    var aliases=ALIASES[amz]||[];
+    for(var a=0;a<aliases.length;a++){
+      var alias=aliases[a];
+      var inAmazon=amazonColSet.has(alias);
+      var inCatalog=catalogColSet.has(alias);
+      if(inAmazon||inCatalog){
+        var src=inAmazon&&inCatalog?'both':inAmazon?'amazon':'catalog';
+        var hasTransform=!!(TRANSFORM_HINTS[amz]);
+        return{amz:amz,required:tf.required,
+          status:hasTransform?'derived':'mapped',
+          source:src,from:alias,
+          note:TRANSFORM_HINTS[amz]||'Direct column match via alias.',
+          confidence:hasTransform?80:95};
+      }
+    }
+
+    // 3. Fuzzy name matching against all available columns
+    var best=null,bestScore=0;
+    allCols.forEach(function(col){
+      var score=matchScore(amz,col);
+      if(score>bestScore){bestScore=score;best=col;}
+    });
+    if(best&&bestScore>=55){
+      var src2=amazonColSet.has(best)?'amazon':'catalog';
+      return{amz:amz,required:tf.required,status:'mapped',source:src2,from:best,
+        note:'Fuzzy name match (score '+bestScore+'). Verify before upload.',confidence:bestScore};
+    }
+
+    // 4. No match found
+    return{amz:amz,required:tf.required,status:'manual',source:'manual',from:'—',
+      note:'No matching column found in either export.',confidence:0};
+  });
+}
+
+// ── Claude mapping ────────────────────────────────────────────
+async function claudeMap(){
+  var tplSummary=templateFields.slice(0,120).map(function(f){
+    return f.name+'|'+(f.required?'REQUIRED':f.conditional?'CONDITIONAL':'optional')
+      +'|'+String(f.description).slice(0,100)+'|'+String(f.validValues).slice(0,80);
+  }).join('\n');
+  var aRow=amazonRows[0]||{},cRow=catalogRows[0]||{};
+  var prompt='You are mapping QBP/Enterworks product data to an Amazon Seller Central flat file for category: '+detectedCategory+'.\n\n'
+    +'AMAZON FLAT FILE FIELDS (name|requirement|description|valid_values):\n'+tplSummary+'\n\n'
+    +'QBP AMAZON EXPORT columns: '+amazonCols.join(', ')+'\nSample row: '+JSON.stringify(aRow).slice(0,1800)+'\n\n'
+    +'QBP ENTERWORKS CATEGORY EXPORT columns: '+catalogCols.join(', ')+'\nSample row: '+JSON.stringify(cRow).slice(0,1800)+'\n\n'
+    +'Return a JSON array ONLY — no markdown, no preamble. Each element:\n'
+    +'{"amz":"<field>","required":true/false,"status":"mapped"|"derived"|"manual","source":"amazon"|"catalog"|"both"|"derived"|"manual","from":"<exact source column or transform>","note":"<under 100 chars>","confidence":0-100}\n\n'
+    +'Rules:\n'
+    +'- mapped: direct column match, no transform\n'
+    +'- derived: computable from source (tilde-split, unit conversion, concatenate, conditional logic, constant value)\n'
+    +'- manual: no source data available\n'
+    +'- Constants (condition_type=New, update_delete=Update, etc): status=derived, source=derived, from="→ constant: \\"value\\""\n'
+    +'- Use exact column names from the source exports in the "from" field';
+
+  var resp=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:prompt}]})
+  });
+  if(!resp.ok){
+    var err=await resp.json().catch(function(){return{};});
+    throw new Error(err.error&&err.error.message?err.error.message:'API error '+resp.status);
+  }
+  var data=await resp.json();
+  var text=data.content.map(function(b){return b.text||'';}).join('');
+  var clean=text.replace(/```json|```/g,'').trim();
+  try{return JSON.parse(clean);}
+  catch(e){
+    var m=clean.match(/\[[\s\S]*\]/);
+    if(m)return JSON.parse(m[0]);
+    throw new Error('Could not parse Claude response as JSON');
+  }
+}
+
+// ── Run mapping ───────────────────────────────────────────────
+async function runMapping(){
+  var usingClaude=isClaudeReady();
+  document.getElementById('map-empty').style.display='none';
+  document.getElementById('map-table-wrap').style.display='none';
+  document.getElementById('map-loading').style.display='';
+  document.getElementById('btn-run').disabled=true;
+  switchTab(0);
+
+  if(usingClaude){
+    document.getElementById('loading-msg').textContent='Sending '+templateFields.length+' template fields to Claude…';
+    document.getElementById('loading-sub').textContent='Analyzing '+amazonCols.length+' Amazon export cols + '+catalogCols.length+' catalog cols';
+  } else {
+    document.getElementById('loading-msg').textContent='Running rule-based mapping…';
+    document.getElementById('loading-sub').textContent=templateFields.length+' template fields · '+amazonCols.length+' Amazon cols · '+catalogCols.length+' catalog cols';
+  }
+
+  try{
+    if(usingClaude){
+      mappingResult=await claudeMap();
+    } else {
+      await new Promise(function(r){setTimeout(r,350);});
+      mappingResult=ruleBasedMap();
+    }
+    issues=[];buildIssues();
+    renderMapTable(usingClaude);
+    renderPreview();
+    renderIssues();
+    updateStats();
+    document.getElementById('btn-export').disabled=false;
+  } catch(err){
+    document.getElementById('map-loading').style.display='none';
+    document.getElementById('map-empty').style.display='';
+    alert('Mapping error: '+err.message);
+  }
+  document.getElementById('btn-run').disabled=false;
+}
+
+// ── Issues ────────────────────────────────────────────────────
+function buildIssues(){
+  issues=[];
+  var aRow=amazonRows[0]||{},cRow=catalogRows[0]||{};
+  mappingResult.forEach(function(f){
+    if(f.required&&f.status==='manual')
+      issues.push({type:'error',field:f.amz,msg:'Required — no source data found. Must be entered manually for every product.'});
+  });
+  mappingResult.forEach(function(f){
+    if(f.required&&f.status==='mapped'){
+      var v=aRow[f.from]!==undefined?aRow[f.from]:(cRow[f.from]!==undefined?cRow[f.from]:'');
+      if(v===''||v===undefined)
+        issues.push({type:'warn',field:f.amz,msg:'Required — mapped from "'+f.from+'" but sample row is empty. Verify source data.'});
+    }
+  });
+  var titleF=mappingResult.find(function(f){return f.amz==='item_name'||f.amz==='title';});
+  if(titleF&&titleF.status==='mapped'){
+    var tv=String(aRow[titleF.from]||cRow[titleF.from]||'');
+    if(tv.length>200)issues.push({type:'error',field:titleF.amz,msg:'Title is '+tv.length+' chars — Amazon limit is 200.'});
+    if(/[!$?^¬¦]/.test(tv))issues.push({type:'error',field:titleF.amz,msg:'Title contains restricted special characters (!, $, ?, ^).'});
+  }
+  var upcF=mappingResult.find(function(f){return f.amz==='external_product_id';});
+  if(upcF&&upcF.status==='mapped'){
+    var uv=String(aRow[upcF.from]||cRow[upcF.from]||'');
+    if(uv&&uv.replace(/\D/g,'').length<12)
+      issues.push({type:'warn',field:'external_product_id',msg:'UPC "'+uv+'" looks short — verify it\'s 12-14 digits.'});
+  }
+  if(aRow['Prop 65 Text']||cRow['Prop 65 Text'])
+    issues.push({type:'info',field:'Prop 65 Text',msg:'Prop 65 content present. Amazon has no dedicated field — confirm placement strategy.'});
+  mappingResult.forEach(function(f){
+    if((f.confidence||100)<50&&f.status!=='manual'&&f.status!=='derived')
+      issues.push({type:'warn',field:f.amz,msg:'Low-confidence match ('+f.confidence+'%) — review before upload.'});
+  });
+}
+
+// ── Render: Field map table ───────────────────────────────────
+function renderMapTable(usingClaude){
+  document.getElementById('map-loading').style.display='none';
+  document.getElementById('map-empty').style.display='none';
+  document.getElementById('map-table-wrap').style.display='';
+  document.getElementById('cnt-map').textContent=mappingResult.length;
+
+  var noteEl=document.getElementById('map-mode-note');
+  noteEl.innerHTML=usingClaude?''
+    :'<div class="rule-note"><strong>Rule-based mapping</strong> — using column name aliases and fuzzy scoring. '
+    +'Add a Claude API key in the sidebar and re-run for smarter handling of transforms, unit conversions, and ambiguous fields.</div>';
+
+  var tbody=document.getElementById('map-tbody');tbody.innerHTML='';
+  mappingResult.forEach(function(def){
+    var tr=document.createElement('tr');
+    var dotCls={mapped:'s-mapped',derived:'s-derived',manual:'s-manual'}[def.status]||'s-unmapped';
+    var statusLbl={mapped:'Auto',derived:'Derived',manual:'Manual'}[def.status]||def.status;
+    var srcLbl={amazon:'Amazon export',catalog:'Catalog export',both:'Both exports',derived:'Logic',manual:'Manual entry'}[def.source]||def.source;
+    var conf=def.confidence!=null?def.confidence:(def.status==='manual'?0:def.status==='derived'?85:90);
+    var confColor=conf>=80?'#2e7d64':conf>=50?'#b8621a':'#b03a54';
+    var confBar=def.status!=='manual'&&def.status!=='derived'
+      ?'<span class="conf-wrap"><span class="conf-bar" style="width:'+conf+'%;background:'+confColor+'"></span></span>':'';
+    tr.innerHTML='<td><span class="field-name">'+esc(def.amz)+'</span></td>'
+      +'<td style="font-size:11px;">'+(def.required?'<span style="color:var(--accent3);">★ Required</span>':'<span style="color:var(--text-dim);">optional</span>')+'</td>'
+      +'<td><span class="status-dot '+dotCls+'"></span>'+statusLbl+confBar+'</td>'
+      +'<td><span class="source-pill '+esc(def.source)+'">'+esc(srcLbl)+'</span></td>'
+      +'<td style="font-size:11px;color:var(--accent2);max-width:180px;">'+esc(def.from||'—')+'</td>'
+      +'<td class="notes-cell">'+esc(def.note||'')+'</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Render: Template guide ────────────────────────────────────
+function renderTemplateGuide(){
+  if(!templateFields.length)return;
+  document.getElementById('tpl-empty').style.display='none';
+  var req=templateFields.filter(function(f){return f.required;}),
+      cond=templateFields.filter(function(f){return f.conditional&&!f.required;}),
+      opt=templateFields.filter(function(f){return !f.required&&!f.conditional;});
+  var html='<div class="info-box"><strong>'+esc(detectedCategory)+'</strong> — '+templateFields.length+' total fields: '
+    +req.length+' required, '+cond.length+' conditional, '+opt.length+' optional</div>';
+  function grp(label,fields){
+    if(!fields.length)return'';
+    return'<div class="section-hdr">'+label+' ('+fields.length+')</div>'
+      +'<table class="mapping-table"><thead><tr><th>Field Name</th><th>Description</th><th>Valid Values / Example</th></tr></thead><tbody>'
+      +fields.map(function(f){
+        return'<tr><td><span class="field-name">'+esc(f.name)+'</span></td>'
+          +'<td class="notes-cell">'+esc(String(f.description).slice(0,200))+'</td>'
+          +'<td class="notes-cell" style="color:var(--accent2);">'+esc(String(f.validValues).slice(0,150))+'</td></tr>';
+      }).join('')+'</tbody></table>';
+  }
+  html+=grp('Required Fields',req)+grp('Conditional Fields',cond)+grp('Optional Fields',opt);
+  document.getElementById('tpl-content').innerHTML=html;
+  document.getElementById('tpl-content').style.display='';
+}
+
+// ── Render: Preview ───────────────────────────────────────────
+function renderPreview(){
+  if(!mappingResult.length)return;
+  document.getElementById('preview-empty').style.display='none';
+  document.getElementById('cnt-prev').textContent='1 SKU';
+  var aRow=amazonRows[0]||{},cRow=catalogRows[0]||{};
+  var sections=[
+    {label:'Identity & Listing Control',re:/sku|asin|product_id|feed_product_type|update_delete|condition/},
+    {label:'Branding & Title',re:/brand|manufacturer|item_name|title|model/},
+    {label:'Pricing & Availability',re:/price|quantity|sale|currency/},
+    {label:'Content & Copy',re:/description|bullet|overview|feature/},
+    {label:'Images',re:/image|photo|picture/},
+    {label:'Dimensions & Weight',re:/length|width|height|weight|dimension|size|unit_of_measure/},
+    {label:'Category Attributes',re:/tire|wheel|bike|helmet|light|sport|color|material|compatible/},
+    {label:'Discovery & Search',re:/keyword|search|generic|taxonomy|browse/},
+  ];
+  var buckets={};sections.forEach(function(s){buckets[s.label]=[];});buckets['Other']=[];
+  mappingResult.forEach(function(f){
+    for(var i=0;i<sections.length;i++){
+      if(sections[i].re.test(f.amz.toLowerCase())){buckets[sections[i].label].push(f);return;}
+    }
+    buckets['Other'].push(f);
+  });
+  var html='';
+  Object.keys(buckets).forEach(function(label){
+    var fields=buckets[label];if(!fields.length)return;
+    html+='<div class="preview-card"><div class="preview-card-label">'+label+'</div>';
+    fields.forEach(function(f){
+      var val='';
+      if(f.status==='manual'){val='';}
+      else if(f.source==='derived'||f.status==='derived'){val=f.from||'';}
+      else{val=aRow[f.from]!==undefined?String(aRow[f.from]):(cRow[f.from]!==undefined?String(cRow[f.from]):'');}
+      var isEmpty=!val;
+      var limit=f.amz.includes('bullet')?255:f.amz.includes('description')?2000:f.amz.includes('keyword')?250:(f.amz==='item_name'||f.amz==='title')?200:0;
+      var over=limit>0&&val.length>limit;
+      var charInfo=val.length>60?' <span class="char-count'+(over?' over':'')+'">'+val.length+(limit?'/'+limit:'')+'</span>':'';
+      html+='<div class="preview-field">'
+        +'<div class="preview-key">'+esc(f.amz)+(f.required?' <span style="color:var(--accent3);font-size:9px;">★</span>':'')+'</div>'
+        +'<div class="preview-val'+(isEmpty?' empty':'')+'">'+( isEmpty?(f.status==='manual'?'(manual entry required)':'(empty in sample)'):esc(val.slice(0,500)) )+charInfo+'</div></div>';
+    });
+    html+='</div>';
+  });
+  document.getElementById('preview-content').innerHTML=html;
+  document.getElementById('preview-content').style.display='';
+}
+
+// ── Render: Issues ────────────────────────────────────────────
+function renderIssues(){
+  document.getElementById('cnt-issues').textContent=issues.length;
+  if(!issues.length){
+    document.getElementById('issues-empty').style.display='';
+    document.getElementById('issues-list').style.display='none';
+    return;
+  }
+  document.getElementById('issues-empty').style.display='none';
+  document.getElementById('issues-list').style.display='';
+  document.getElementById('issues-list').innerHTML=issues.map(function(iss){
+    return'<div class="issue-row"><div class="issue-type '+iss.type+'">'+iss.type.toUpperCase()+'</div>'
+      +'<div class="issue-field">'+esc(iss.field)+'</div><div class="issue-msg">'+esc(iss.msg)+'</div></div>';
+  }).join('');
+}
+
+// ── Stats ─────────────────────────────────────────────────────
+function updateStats(){
+  var total=mappingResult.length,
+      req=mappingResult.filter(function(f){return f.required;}).length,
+      mapped=mappingResult.filter(function(f){return f.status==='mapped';}).length,
+      derived=mappingResult.filter(function(f){return f.status==='derived';}).length,
+      manual=mappingResult.filter(function(f){return f.status==='manual';}).length,
+      cov=total?Math.round((mapped+derived)/total*100):0;
+  document.getElementById('st-total').textContent=total;
+  document.getElementById('st-req').textContent=req;
+  document.getElementById('st-mapped').textContent=mapped;
+  document.getElementById('st-derived').textContent=derived;
+  document.getElementById('st-manual').textContent=manual;
+  document.getElementById('prog-bar').style.width=cov+'%';
+}
+
+// ── Export CSV ────────────────────────────────────────────────
+function exportCSV(){
+  var headers=mappingResult.map(function(f){return f.amz;});
+  var byMPN={};
+  catalogRows.forEach(function(r){var k=r['Manufacturer Part Number']||r['SKU']||'';byMPN[k]=r;});
+  var rows=amazonRows.map(function(aRow){
+    var mpn=aRow['Manufacturer Part Number']||aRow['QBP Part Number']||'';
+    var cRow=byMPN[mpn]||{};
+    return headers.map(function(h){
+      var def=mappingResult.find(function(f){return f.amz===h;});
+      if(!def||def.status==='manual')return'';
+      if(def.source==='derived'||def.status==='derived'){
+        var cm=(def.from||'').match(/constant:\s*["']?([^"'\s,]+)/i);
+        return cm?cm[1]:def.from||'';
+      }
+      var k=def.from||'';
+      return aRow[k]!==undefined?aRow[k]:(cRow[k]!==undefined?cRow[k]:'');
+    });
+  });
+  var cat=(detectedCategory||'amazon').replace(/[^a-z0-9]/gi,'_').toLowerCase();
+  var csv=[headers].concat(rows).map(function(r){
+    return r.map(function(v){return'"'+String(v).replace(/"/g,'""')+'"';}).join(',');
+  }).join('\n');
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='amazon_'+cat+'_mapped_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+}
+
+// ── Tabs ──────────────────────────────────────────────────────
+function switchTab(idx){
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+  document.getElementById('tab-'+idx).classList.add('active');
+  document.querySelectorAll('.tab')[idx].classList.add('active');
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+</script>
+</body>
+</html>
